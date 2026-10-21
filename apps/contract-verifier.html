@@ -55,7 +55,8 @@ footer {margin-top:45px;color:var(--muted);font-size:13px}
 <div><button id="verify">Verify with Bitcoin Core</button></div>
 </div>
 <div class="row" style="margin-top:16px">
-<button type="button" id="example_human" class="secondary">Load public human sample (777 blocks)</button>
+<button type="button" id="example_human" class="secondary">Load human contract A (777 blocks)</button>
+<button type="button" id="example_human_mirror" class="secondary">Load mirror contract B (777 blocks)</button>
 <button type="button" id="example_agent" class="secondary">Load public agent sample (144 blocks, 2-of-2)</button>
 </div>
 <p class="muted"><small>Samples are public test vectors from the HODLXXI repository. The human contract examples have documented historical funding outpoints, not a guarantee of current unspent balances; the declared agent sample is not a funding proof.</small></p>
@@ -88,6 +89,7 @@ const enc = text => new TextEncoder().encode(text);
 const dec = bytes => new TextDecoder().decode(bytes);
 let emulator, guestState = "boot", binaries, manifest, current = null, sequence = 0;
 let tail = "", line = "", serialLog = "", verifiedAddress = null, verifiedNetwork = null;
+let verificationRevision = 0; // invalidate stale verification/UI and asynchronous API replies
 let readPending = false;
 const status = (id, message, kind = "") => { const el = $(id); el.textContent = message; el.className = "status " + kind; };
 const addFact = (target, name, value) => {
@@ -227,16 +229,24 @@ function checkPrompts() {
         runJob();
     }
 }
+function resetVerifiedAddress() {
+    verificationRevision++;
+    verifiedAddress=null; verifiedNetwork=null; $("fund").disabled=true;
+    $("result").hidden=true; $("funding_result").hidden=true;
+    status("funding_status","Not checked. Verify the current public input before querying any address.");
+}
+function inputChanged() {
+    resetVerifiedAddress();
+    if (!current) status("verify_status","Input or network changed. Run Verify again.");
+}
 function startVerify() {
     try {
         const input = $("contract_input").value.trim();
         const mode = publicInput(input);
         if (guestState === "dead") throw Error("Guest startup failed. Reload after correcting the error.");
         if (current) throw Error("Verification is already running.");
-        verifiedAddress=null; verifiedNetwork=null; $("fund").disabled=true;
-        $("result").hidden=true; $("funding_result").hidden=true;
-        status("funding_status","First verify an address above.");
-        current = {id:++sequence,input,mode,network:$("network").value,dispatched:false};
+        resetVerifiedAddress();
+        current = {id:++sequence,input,mode,network:$("network").value,dispatched:false,revision:verificationRevision};
         status("verify_status",guestState==="ready"?"Running Bitcoin Core…":"Queued until the offline guest finishes booting…");
         runJob();
     } catch (e) {status("verify_status",e.message,"bad");}
@@ -268,6 +278,11 @@ async function finishJob(rc) {
         readOutput(prefix+".decoded.json"),readOutput(prefix+".info.json"),
         readOutput(prefix+".addresses.json"),readOutput(prefix+".error"),readOutput(prefix+".derive.error")
     ]);
+    if (job.revision!==verificationRevision ||
+        job.input!==$("contract_input").value.trim() || job.network!==$("network").value) {
+        status("verify_status","Input changed while Bitcoin Core was checking. Verify the new input again.");
+        return;
+    }
     if (rc !== 0) {
         status("verify_status","Bitcoin Core rejected the input: "+(error || "see serial console"),"bad");
         return;
@@ -286,6 +301,7 @@ async function finishJob(rc) {
             addFact("facts","Bitcoin Core ASM",response.asm || "(none)");
             const scriptHex=job.mode==="script"?job.input:job.input.match(/^raw\(([0-9a-fA-F]+)\)/)[1];
             const hash=await sha256hex(hexBytes(scriptHex));
+            if (job.revision!==verificationRevision) throw Error("Input changed during verification; please re-run.");
             if (!hash) throw Error("SHA256 not supported in this browser");
             if (response.segwit?.hex?.toLowerCase() !== "0020"+hash)
                 throw Error("Bitcoin Core SegWit witness program does not match independently hashed script");
@@ -347,13 +363,14 @@ function renderTable(node,head,rows) {
     t.append(tb);node.append(t);
 }
 async function checkFunding() {
-    const addr=verifiedAddress,chain=verifiedNetwork;
+    const addr=verifiedAddress,chain=verifiedNetwork,revision=verificationRevision;
     if(!addr || !chain || $("fund").disabled) return;
     $("fund").disabled=true; $("funding_result").hidden=true;
     status("funding_status","Querying mempool.space; results are external API reports, not independently verified…");
     try {
         const base=apiBase[chain]+"/address/"+encodeURIComponent(addr);
         const [utxos,history]=await Promise.all([fetchJson(base+"/utxo"),fetchJson(base+"/txs")]);
+        if(revision!==verificationRevision || addr!==verifiedAddress || chain!==verifiedNetwork) return;
         if(!Array.isArray(utxos)||!Array.isArray(history)) throw Error("Unexpected API response");
         const confirmed=utxos.filter(x=>x.status?.confirmed),unconfirmed=utxos.filter(x=>!x.status?.confirmed);
         const sum=a=>a.reduce((n,x)=>n+x.value,0);
@@ -370,8 +387,8 @@ async function checkFunding() {
         renderTable($("history"),["Transaction ID","Status"],history.slice(0,25).map(x=>[x.txid,x.status?.confirmed?"confirmed":"unconfirmed"]));
         $("funding_result").hidden=false;
         status("funding_status","API query completed · address history and UTXOs are externally reported","ok");
-    } catch(e){status("funding_status",e.message+" · No independent funding verification performed.","bad");}
-    finally { $("fund").disabled=false; }
+    } catch(e){if(revision===verificationRevision)status("funding_status",e.message+" · No independent funding verification performed.","bad");}
+    finally { if(revision===verificationRevision && addr===verifiedAddress) $("fund").disabled=false; }
 }
 async function loadPublicExample(index) {
     if (current) { status("verify_status","Wait for the current verification to finish."); return; }
@@ -384,14 +401,15 @@ async function loadPublicExample(index) {
         if(!vector)throw Error("Missing public fixture");
         $("contract_input").value=vector.raw_descriptor||vector.script_hex;
         $("network").value=vector.network;
-        verifiedAddress=null;verifiedNetwork=null;$("fund").disabled=true;
-        $("result").hidden=true;$("funding_result").hidden=true;
-        status("funding_status","Not checked (a public sample has been loaded).");
+        resetVerifiedAddress();
         status("verify_status","Loaded "+vector.name+". Press Verify with Bitcoin Core to test locally.");
     }catch(e){status("verify_status",e.message,"bad");}
 }
 $("example_human").addEventListener("click",()=>loadPublicExample(0));
+$("example_human_mirror").addEventListener("click",()=>loadPublicExample(1));
 $("example_agent").addEventListener("click",()=>loadPublicExample(2));
+$("contract_input").addEventListener("input",inputChanged);
+$("network").addEventListener("change",inputChanged);
 $("verify").addEventListener("click",startVerify);
 $("fund").addEventListener("click",checkFunding);
 window.onload=()=> (window.offline_bundle?window.offline_bundle.ready:Promise.resolve()).then(startMachine).catch(e=>status("machine_status",e.message,"bad"));
