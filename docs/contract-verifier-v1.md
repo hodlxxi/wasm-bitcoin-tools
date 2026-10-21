@@ -112,6 +112,36 @@ The workflow `.github/workflows/contract-verifier-tests.yml` runs those
 tests on the PR. **Passing this unit suite is not equivalent to browser
 integration or Core RPC testing.**
 
+## Real browser integration evidence
+
+On **2026-10-21**, GitHub Actions
+[Contract Verifier Browser Acceptance](https://github.com/hodlxxi/wasm-bitcoin-tools/actions/runs/39550454738)
+built the upstream `v86_64` emulator, booted actual Alpine Linux in headless
+Chrome through its byte-range-capable HTTP server, started the official
+**Bitcoin Core 31.1** guest with networking disabled, and executed
+`decodescript` / `getdescriptorinfo` against all **three** real public
+HODLXXI fixtures:
+
+- Human A, legacy_777: correct Core-derived P2WSH address and timelock delta.
+- Mirrored human B, legacy_777: correct independent address and delta.
+- Operator-agent, current_144: correct public `raw(...)` descriptor parsing,
+  2-of-2 cooperative path and Core-derived P2WSH address.
+- The browser displayed the *mock* 300,000-sat UTXO API balance only after
+  explicitly clicking the lookup button, displayed zero for the mocked
+  unfunded agent address, and invalidated a previously verified address
+  when the user edited the input.
+
+**Browser API responses in this run were deliberately mocked** to test
+opt-in behavior and UI transitions deterministically. Separate
+[real two-source Esplora checks](https://github.com/hodlxxi/wasm-bitcoin-tools/actions/runs/39537461170)
+confirmed 300,000 sats at each human address and zero at the agent address
+at that snapshot time. Neither test substitutes for independent full-node
+consensus validation.
+
+This automated pass establishes a reproducible browser **development smoke
+test**, not an audit of all consensus/script edge cases, device compatibility
+or the eventual GitHub Pages deployment.
+
 ## Required browser acceptance checks before merging
 
 1. Build the complete site with the upstream `scripts/setup.sh` flow on
