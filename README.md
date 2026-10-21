@@ -15,9 +15,12 @@
 > The existing wallet, recovery, and PSBT tools remain upstream work.
 > See [verification scope and acceptance gates](docs/contract-verifier-v1.md).
 >
-> **Status:** Draft [PR #1](https://github.com/hodlxxi/wasm-bitcoin-tools/pull/1).
-> Do not rely on this new browser feature until its integrated Bitcoin Core
-> smoke test, security review, and Pages deployment have passed.
+> **Release status / evidence:** The proposal and verification evidence live in
+> [PR #1](https://github.com/hodlxxi/wasm-bitcoin-tools/pull/1).
+> The real Chrome/v86/Bitcoin Core integration and static/offline artifact builds
+> passed CI; the published Pages URL (when enabled) is a **public beta**, not
+> a consensus-verifying Bitcoin full node or a security-audited wallet.
+> This inspector takes public data only. Never paste wallet secrets.
 
 Bitcoin tools that run an unmodified Bitcoin Core in your browser. Each page boots Alpine Linux
 headlessly (no display, no network device) in [v86_64](https://github.com/portlandhodl/v86_64),
