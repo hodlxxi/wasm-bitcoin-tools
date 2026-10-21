@@ -51,10 +51,14 @@ jobs:
 
       - name: Boot actual Bitcoin Core in Chromium and verify contracts
         run: |
-          python3 -m http.server 8765 --bind 127.0.0.1 --directory _site >/tmp/verifier-http.log 2>&1 &
+          # v86's ISO streaming requires byte-range (206) responses: Python's
+          # default http.server is incompatible. Use upstream's own server.
+          node v86_64/tools/serve.mjs --root _site --port 8765 --host 127.0.0.1 >/tmp/verifier-http.log 2>&1 &
           echo $! >/tmp/verifier-http.pid
           sleep 2
           curl --fail --silent --show-error --head http://127.0.0.1:8765/apps/contract-verifier.html
+          range_status="$(curl --silent --show-error -o /dev/null -w '%{http_code}' -H 'Range: bytes=0-99' http://127.0.0.1:8765/images/alpine-virt-3.19.9-x86_64.iso)"
+          test "$range_status" = 206 || { echo "HTTP Range byte requests required: expected 206, got $range_status"; cat /tmp/verifier-http.log; exit 1; }
           node tests/browser-contract-verifier-smoke.mjs
         env:
           CONTRACT_VERIFIER_TEST_URL: http://127.0.0.1:8765/
