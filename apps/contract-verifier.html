@@ -74,7 +74,7 @@ footer {margin-top:45px;color:var(--muted);font-size:13px}
 </main>
 <script>
 "use strict";
-const GUEST_SCRIPT = "#!/bin/sh\n# Input reaches the guest only via the 9p share. There is no network device.\nM=/mnt\nD=/tmp/btc-contract-verifier\nCHAIN=$1\nMODE=$2\nJ=$M/$3\nLD=\"$M/ld-linux-x86-64.so.2 --library-path $M\"\nCLI=\"$LD $M/bitcoin-cli -datadir=$D -chain=$CHAIN\"\nfinish() { sync; printf '@@CONTRACT_DONE:%s:%s@@\\n' \"$3\" \"$1\"; exit \"$1\"; }\nif ! $CLI getblockchaininfo >/dev/null 2>&1; then\n    ip link set lo up 2>/dev/null || ifconfig lo up 2>/dev/null\n    mkdir -p \"$D\"\n    $LD \"$M/bitcoind\" -datadir=\"$D\" -chain=\"$CHAIN\" -disablewallet \\\n        -networkactive=0 -connect=0 -listen=0 -dnsseed=0 -listenonion=0 \\\n        -dbcache=16 -maxmempool=5 -par=1 -server=1 -printtoconsole=0 \\\n        >\"$D/bitcoind.out\" 2>&1 &\n    pid=$!\n    i=0\n    until $CLI getblockchaininfo >/dev/null 2>&1; do\n        i=$((i+1))\n        if ! kill -0 \"$pid\" 2>/dev/null || [ \"$i\" -gt 180 ]; then\n            cat \"$D/bitcoind.out\" >\"$J.error\"\n            finish 1\n        fi\n        sleep 1\n    done\nfi\nif [ \"$MODE\" = script ]; then\n    $CLI -stdin decodescript <\"$J.input\" >\"$J.decoded.json\" 2>\"$J.error\"\n    rc=$?\nelif [ \"$MODE\" = descriptor ]; then\n    $CLI -stdin getdescriptorinfo <\"$J.input\" >\"$J.info.json\" 2>\"$J.error\"\n    rc=$?\n    if [ \"$rc\" -eq 0 ]; then\n        $CLI -stdin deriveaddresses <\"$J.input\" >\"$J.addresses.json\" 2>\"$J.derive.error\"\n    fi\nelse\n    echo \"Unsupported verification mode\" >\"$J.error\"\n    rc=2\nfi\nfinish \"$rc\"\n";
+const GUEST_SCRIPT = "#!/bin/sh\n# Input reaches the guest only via the 9p share. There is no network device.\nM=/mnt\nD=/tmp/btc-contract-verifier\nCHAIN=$1\nMODE=$2\nJ=$M/$3\nJOB=$4\nLD=\"$M/ld-linux-x86-64.so.2 --library-path $M\"\nCLI=\"$LD $M/bitcoin-cli -datadir=$D -chain=$CHAIN\"\nfinish() { sync; printf '@@CONTRACT_DONE:%s:%s@@\\n' \"$JOB\" \"$1\"; exit \"$1\"; }\nif ! $CLI getblockchaininfo >/dev/null 2>&1; then\n    ip link set lo up 2>/dev/null || ifconfig lo up 2>/dev/null\n    mkdir -p \"$D\"\n    $LD \"$M/bitcoind\" -datadir=\"$D\" -chain=\"$CHAIN\" -disablewallet \\\n        -networkactive=0 -connect=0 -listen=0 -dnsseed=0 -listenonion=0 \\\n        -dbcache=16 -maxmempool=5 -par=1 -server=1 -printtoconsole=0 \\\n        >\"$D/bitcoind.out\" 2>&1 &\n    pid=$!\n    i=0\n    until $CLI getblockchaininfo >/dev/null 2>&1; do\n        i=$((i+1))\n        if ! kill -0 \"$pid\" 2>/dev/null || [ \"$i\" -gt 180 ]; then\n            cat \"$D/bitcoind.out\" >\"$J.error\"\n            finish 1\n        fi\n        sleep 1\n    done\nfi\nif [ \"$MODE\" = script ]; then\n    $CLI -stdin decodescript <\"$J.input\" >\"$J.decoded.json\" 2>\"$J.error\"\n    rc=$?\nelif [ \"$MODE\" = descriptor ]; then\n    $CLI -stdin getdescriptorinfo <\"$J.input\" >\"$J.info.json\" 2>\"$J.error\"\n    rc=$?\n    if [ \"$rc\" -eq 0 ]; then\n        $CLI -stdin deriveaddresses <\"$J.input\" >\"$J.addresses.json\" 2>\"$J.derive.error\"\n    fi\nelse\n    echo \"Unsupported verification mode\" >\"$J.error\"\n    rc=2\nfi\nfinish \"$rc\"\n";
 const ALPINE_ISO = "../images/alpine-virt-3.19.9-x86_64.iso";
 const ALPINE_BOOT = "../images/alpine-virt-3.19.9-x86_64/boot/";
 const BITCOIN_DIR = "../images/bitcoin/";
@@ -93,7 +93,7 @@ const hexBytes = str => Uint8Array.from(str.match(/../g), h => parseInt(h, 16));
 const hexStr = bytes => Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
 function publicInput(text) {
     if (!text || text.length > 20000) throw Error("Provide one script/descriptor, up to 20,000 characters.");
-    if (/\b(xprv|tprv|vprv|uprv|yprv|zprv|seed|wif)\b/i.test(text) || /(?:^|[^A-Za-z0-9])[5KL][1-9A-HJ-NP-Za-km-z]{50,51}(?:$|[^A-Za-z0-9])/.test(text))
+    if (/(xprv|tprv|vprv|uprv|yprv|zprv)/i.test(text) || /(?:^|[^A-Za-z0-9])[5KL][1-9A-HJ-NP-Za-km-z]{50,51}(?:$|[^A-Za-z0-9])/.test(text))
         throw Error("Potentially sensitive material detected. Use public descriptors or witnessScript HEX only.");
     if (/^[0-9a-fA-F]+$/.test(text)) {
         if (text.length % 2 || text.length > 20000) throw Error("Witness script must contain whole hex bytes (max 10 KB).");
@@ -278,7 +278,7 @@ async function finishJob(rc) {
             verifiedAddress=derived;verifiedNetwork=job.network;$("fund").disabled=false;
         }
         $("core_response").textContent=JSON.stringify(response,null,2);
-        status("verify_status",derived?"Bitcoin Core completed local validation. Funding has NOT been checked.":"Bitcoin Core validated the descriptor, but a single address could not be derived.","ok");
+        status("verify_status",derived?"Bitcoin Core decoded the input and derived an address. This is not a spendability proof; funding has NOT been checked.":"Bitcoin Core validated the descriptor, but a single address could not be derived.","ok");
     } catch(e) {status("verify_status","Could not interpret Bitcoin Core result: "+e.message,"bad");}
 }
 const apiBase={
