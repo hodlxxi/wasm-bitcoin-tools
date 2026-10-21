@@ -1,10 +1,10 @@
 # wasm-bitcoin-tools
 
-[![Pages](https://github.com/portlandhodl/wasm-bitcoin-tools/actions/workflows/pages.yml/badge.svg)](https://portlandhodl.github.io/wasm-bitcoin-tools/)
-[![Offline release](https://img.shields.io/badge/release-offline-informational)](https://github.com/portlandhodl/wasm-bitcoin-tools/releases/tag/offline)
+[![Pages](https://github.com/hodlxxi/wasm-bitcoin-tools/actions/workflows/pages.yml/badge.svg)](https://hodlxxi.github.io/wasm-bitcoin-tools/)
+[![Offline release](https://img.shields.io/badge/release-offline-informational)](https://github.com/hodlxxi/wasm-bitcoin-tools/releases/tag/offline)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-> **HODLXXI fork — independent Bitcoin Contract Verifier (under development).** The
+> **HODLXXI fork — independent Bitcoin Contract Verifier (public beta).** The
 > [new verifier](apps/contract-verifier.html) uses the same offline Bitcoin Core
 > WASM guest as the original tools to inspect *public* P2WSH witnessScripts,
 > `raw(HEX)` script descriptors, pubkeys, and OP_CHECKLOCKTIMEVERIFY branches.
@@ -18,7 +18,7 @@
 > **Release status / evidence:** The proposal and verification evidence live in
 > [PR #1](https://github.com/hodlxxi/wasm-bitcoin-tools/pull/1).
 > The real Chrome/v86/Bitcoin Core integration and static/offline artifact builds
-> passed CI; the published Pages URL (when enabled) is a **public beta**, not
+> passed CI; the published Pages version is a **public beta**, not
 > a consensus-verifying Bitcoin full node or a security-audited wallet.
 > This inspector takes public data only. Never paste wallet secrets.
 
@@ -28,7 +28,16 @@ an x86-64 emulator in WebAssembly. It then runs the official x86_64 Bitcoin Core
 networking disabled, and drives it over the serial console. Files reach the machine through a
 virtio 9p share in the page, and results come back the same way. Nothing is uploaded.
 
-**Try it: <https://portlandhodl.github.io/wasm-bitcoin-tools/>**
+## Launch the HODLXXI tools
+
+**[Open HODLXXI Bitcoin Contract Verifier →](https://hodlxxi.github.io/wasm-bitcoin-tools/apps/contract-verifier.html)**
+
+**[Try all four tools on HODLXXI GitHub Pages →](https://hodlxxi.github.io/wasm-bitcoin-tools/)**
+
+[Download the standalone HTML verifier](https://github.com/hodlxxi/wasm-bitcoin-tools/releases/download/offline/contract-verifier.html) ·
+[Browse this fork's source](https://github.com/hodlxxi/wasm-bitcoin-tools)
+
+This fork is based on **[PortlandHODL's original wasm-bitcoin-tools](https://github.com/portlandhodl/wasm-bitcoin-tools)** (MIT-licensed). The original three tools are preserved; the independent HODLXXI Contract Verifier is the fourth. The author's website is a separate deployment and does **not** include this fork's added verifier.
 
 | Bitcoin Core wallet check | AnchorWatch vault recovery check | PSBT finalizer |
 |---|---|---|
@@ -52,6 +61,7 @@ real Bitcoin Core, without installing it, syncing a node or trusting a third-par
 
 ### Main Features
 **Can check the following**
+- Public HODLXXI P2WSH/CLTV contract scripts and descriptors (with optional external Esplora funding lookup)
 - Bitcoin Core wallet files (`wallet.dat`): SQLite descriptor wallets restored as they are,
   Berkeley DB legacy wallets migrated to descriptors, encrypted wallets unlocked with a passphrase
 - AnchorWatch Trident Vault recovery kits (PDF), turned into a watch-only wallet you can download
@@ -60,8 +70,8 @@ real Bitcoin Core, without installing it, syncing a node or trusting a third-par
 **Runs with**
 - The official Bitcoin Core 31.1 release binaries, sha256-verified, unmodified
 - A 64-bit Alpine Linux guest with no network device: the node never connects anywhere
-- Everything in the browser tab: files stay on your machine, and the machine is gone when you
-  close the tab
+- The Bitcoin Core guest runs without networking. Its local script checks remain in the browser; the Contract Verifier contacts mempool.space **only when** you click its optional public-address funding lookup. This is not independent UTXO consensus verification.
+- The emulated machine disappears when you close the tab.
 
 **Can be used**
 - Hosted, on GitHub Pages, to try the tools out
@@ -73,9 +83,7 @@ real Bitcoin Core, without installing it, syncing a node or trusting a third-par
 - Memory for the emulated machine, which has 1024 MiB
 
 ### Usage
-1. Open a tool from the [directory](https://portlandhodl.github.io/wasm-bitcoin-tools/), or
-   download its single-file version from the
-   [offline release](https://github.com/portlandhodl/wasm-bitcoin-tools/releases/tag/offline).
+1. Open the [HODLXXI Contract Verifier](https://hodlxxi.github.io/wasm-bitcoin-tools/apps/contract-verifier.html), browse the [four-tool directory](https://hodlxxi.github.io/wasm-bitcoin-tools/), or download the standalone HTML from [this fork's offline release](https://github.com/hodlxxi/wasm-bitcoin-tools/releases/tag/offline).
 2. Opened from anywhere but a local file, the page asks you to type a number to show you read
    its safety notice.
 3. The machine boots in about 30 seconds. Then drop in a file, or run one of the demos or
@@ -91,6 +99,7 @@ single-file version, audit it, and open it on an air-gapped computer. **Never us
 | [apps/bitcoin-wallet-check.html](apps/bitcoin-wallet-check.html) | Imports a `wallet.dat` (SQLite restored, Berkeley DB migrated), optionally unlocks it, and lists its descriptors and addresses. Demo wallets in [apps/bitcoin-wallets/](apps/bitcoin-wallets/) run with one click. |
 | [apps/anchorwatch-recovery.html](apps/anchorwatch-recovery.html) | Reads an AnchorWatch Trident Vault recovery kit (PDF) and has Bitcoin Core validate its descriptors, create the watch-only wallet, list the receive and change addresses and back up the wallet for download. |
 | [apps/psbt-finalizer.html](apps/psbt-finalizer.html) | Combines PSBTs from several signers, fills in scripts from public descriptors, reports what each input still needs and finalizes them with `finalizepsbt`, on a wallet-less node at block 0. Timelocked spends finalize too: `after()`/`older()` are checked against the transaction's own `nLockTime`/`nSequence`. Samples in [apps/psbt-samples/](apps/psbt-samples/). |
+| [HODLXXI Bitcoin Contract Verifier](https://hodlxxi.github.io/wasm-bitcoin-tools/apps/contract-verifier.html) ([source](apps/contract-verifier.html)) | Inspects public P2WSH contracts (including human 777-block and operator-agent 144-block CLTV templates) using offline Bitcoin Core, then optionally queries mempool.space for externally reported funding. No private keys or HODLXXI server required. |
 
 ## Layout
 
@@ -114,7 +123,7 @@ single-file version, audit it, and open it on an air-gapped computer. **Never us
 
 ## Running it locally
 
-    git clone --recurse-submodules https://github.com/portlandhodl/wasm-bitcoin-tools
+    git clone --recurse-submodules https://github.com/hodlxxi/wasm-bitcoin-tools
     cd wasm-bitcoin-tools
     ./scripts/setup.sh          # emulator, Alpine 3.19 virt (downloaded, sha256-checked), Bitcoin Core 31.1
     ./scripts/serve.sh          # http://localhost:8000/
