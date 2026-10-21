@@ -1,6 +1,6 @@
 # HODLXXI Bitcoin Contract Verifier V1 — Development / Review Only
 
-Status: **Draft PR, not production-certified.** This tool reuses the public
+Status: **Development-tested public-data beta, not production-certified or full-node consensus verification.** This tool reuses the public
 `wasm-bitcoin-tools` v86_64 guest and unmodified, offline Bitcoin Core.
 Only the browser page may make an **explicitly user-triggered** call to
 `mempool.space` (Esplora); Bitcoin Core itself has no network device.
@@ -142,7 +142,7 @@ This automated pass establishes a reproducible browser **development smoke
 test**, not an audit of all consensus/script edge cases, device compatibility
 or the eventual GitHub Pages deployment.
 
-## Required browser acceptance checks before merging
+## Browser acceptance and remaining deployment gates
 
 1. Build the complete site with the upstream `scripts/setup.sh` flow on
    supported x86_64 Linux, with Bitcoin Core integrity checks enabled.
@@ -165,5 +165,13 @@ or the eventual GitHub Pages deployment.
    spoofing, large input, resource limits, privacy) and regression testing
    of the original three tools.
 
-**Deployment boundary:** draft PR only; don't merge to `master` or publish a
-production verifier until these checks pass.
+**Deployment boundary:** only promote a commit with green unit, actual
+v86/Bitcoin Core browser checks, and all four offline build checks. The
+[CI run at this tested version](https://github.com/hodlxxi/wasm-bitcoin-tools/actions/runs/39550818069)
+passed the full static site build, all four checksum-verified single-file
+offline builds, and Chrome verification of the two live human scripts and
+the declared operator-agent script. A successful production GitHub Pages
+publish is a separate final deployment gate. Public beta users must still
+treat the funding API as an externally reported observation, never a local
+consensus proof; a professional security audit and broad device coverage
+are not claimed.
