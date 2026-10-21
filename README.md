@@ -4,6 +4,21 @@
 [![Offline release](https://img.shields.io/badge/release-offline-informational)](https://github.com/portlandhodl/wasm-bitcoin-tools/releases/tag/offline)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
+> **HODLXXI fork — independent Bitcoin Contract Verifier (under development).** The
+> [new verifier](apps/contract-verifier.html) uses the same offline Bitcoin Core
+> WASM guest as the original tools to inspect *public* P2WSH witnessScripts,
+> `raw(HEX)` script descriptors, pubkeys, and OP_CHECKLOCKTIMEVERIFY branches.
+> It includes public, two-legged human `legacy_777` and operator-agent
+> `current_144` examples. A separate **opt-in** check sends *only the public
+> address* to mempool.space's Esplora API for externally reported UTXOs. These
+> reports are **not full-node consensus verification**; never enter a secret.
+> The existing wallet, recovery, and PSBT tools remain upstream work.
+> See [verification scope and acceptance gates](docs/contract-verifier-v1.md).
+>
+> **Status:** Draft [PR #1](https://github.com/hodlxxi/wasm-bitcoin-tools/pull/1).
+> Do not rely on this new browser feature until its integrated Bitcoin Core
+> smoke test, security review, and Pages deployment have passed.
+
 Bitcoin tools that run an unmodified Bitcoin Core in your browser. Each page boots Alpine Linux
 headlessly (no display, no network device) in [v86_64](https://github.com/portlandhodl/v86_64),
 an x86-64 emulator in WebAssembly. It then runs the official x86_64 Bitcoin Core in it with
