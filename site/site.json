@@ -1,8 +1,8 @@
 {
-    "site_url": "https://portlandhodl.github.io/wasm-bitcoin-tools/",
-    "site_name": "wasm-bitcoin-tools",
-    "title": "wasm-bitcoin-tools: Bitcoin tools that run Bitcoin Core in your browser",
-    "description": "A directory of Bitcoin tools built on v86_64: each runs an unmodified Bitcoin Core in a Linux machine emulated in WebAssembly in the browser tab, offline. Nothing is uploaded.",
+    "site_url": "https://hodlxxi.github.io/wasm-bitcoin-tools/",
+    "site_name": "wasm-bitcoin-tools · HODLXXI",
+    "title": "Bitcoin Core WASM tools and independent Contract Verifier · HODLXXI",
+    "description": "Browser-based Bitcoin Core tools: offline wallet, vault and PSBT checks, plus a public-data-only contract inspector with explicit, optional Esplora funding lookup.",
     "apps": [
         {
             "page": "bitcoin-wallet-check",
@@ -61,6 +61,24 @@
             ],
             "image": "og-psbt-finalizer.png",
             "image_alt": "PSBT finalizer: a timelocked PSBT finalized at block 0, broadcastable from 17 March 2030"
+        },
+        {
+            "page": "contract-verifier",
+            "title": "Bitcoin Contract Verifier: independently decode P2WSH scripts and check funding",
+            "description": "Use unmodified offline Bitcoin Core to inspect public HODLXXI P2WSH scripts (including legacy_777 human and current_144 operator-agent patterns), with optional Esplora funding lookup.",
+            "theme_color": "#f7931a",
+            "name": "Bitcoin Contract Verifier",
+            "tagline": "Decode P2WSH scripts and raw descriptors, inspect 777- or 144-block timelock paths, derive addresses with Bitcoin Core, and optionally query reported UTXOs.",
+            "icon": "seal",
+            "tags": [
+                "P2WSH",
+                "CLTV",
+                "descriptors",
+                "optional Esplora"
+            ],
+            "files": [
+                "tests/fixtures/public-contract-vectors.json"
+            ]
         }
     ],
     "links": [

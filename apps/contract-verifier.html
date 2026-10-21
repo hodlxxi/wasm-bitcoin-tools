@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitcoin Contract Verifier — HODLXXI</title>
+<link rel="icon" href="../v86_64/icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../v86_64/icons/icon-32.png" sizes="32x32" type="image/png">
+<script src="../v86_64/build/libv86.js"></script>
+<style>
+:root {color-scheme:dark;--bg:#0a1013;--card:#131c20;--line:#294148;--fg:#f0f5f5;--muted:#a9b9bc;--btc:#f7931a;--ok:#5be0b1;--warn:#ffd17a;--bad:#ff8d8d}
+* {box-sizing:border-box}
+body {margin:0;background:radial-gradient(900px 400px at 50% -20%,#263e3d,var(--bg));color:var(--fg);font:16px/1.55 system-ui,-apple-system,sans-serif}
+main {max-width:960px;margin:auto;padding:26px 18px 90px}
+h1 {font-size:clamp(29px,5vw,46px);line-height:1.12;margin:22px 0 10px}
+h1 em {font-style:normal;color:var(--btc)}
+a {color:var(--btc)}
+h2 {font-size:19px;margin:27px 0 12px}
+p {margin:8px 0}
+.muted,small {color:var(--muted)}
+.card {background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin:12px 0}
+label {display:block;font-weight:650;margin:10px 0 6px}
+textarea,select {width:100%;background:#091014;color:var(--fg);border:1px solid #44616c;border-radius:8px;padding:11px;font:inherit}
+textarea {min-height:120px;resize:vertical;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere}
+button {background:var(--btc);color:#160c00;border:0;border-radius:8px;padding:11px 16px;font-weight:750;cursor:pointer}
+button.secondary {background:transparent;border:1px solid var(--btc);color:var(--btc)}
+button:disabled {opacity:.48;cursor:not-allowed}
+.row {display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+.row>div {flex:1;min-width:160px}
+.status {border-left:4px solid var(--warn);padding:11px 15px;background:#26241a;border-radius:3px}
+.status.ok {border-color:var(--ok);background:#113028}
+.status.bad {border-color:var(--bad);background:#3a171a}
+pre {white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace}
+dl {display:grid;grid-template-columns:minmax(110px,190px) minmax(0,1fr);gap:8px 14px;margin:14px 0}
+dt {color:var(--muted)} dd {margin:0;overflow-wrap:anywhere;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+table {width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px}
+th,td {text-align:left;border-bottom:1px solid var(--line);padding:8px;overflow-wrap:anywhere}
+.note {background:#1f252a;border-left:3px solid var(--btc);padding:12px 14px;border-radius:4px}
+.good {color:var(--ok)} .warning {color:var(--warn)}
+summary {cursor:pointer}
+footer {margin-top:45px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body><main>
+<a href="../index.html">← wasm-bitcoin-tools</a>
+<h1>Independent <em>Bitcoin Contract Verifier</em></h1>
+<p class="muted">HODLXXI · A public-data-only, watch-only inspector using unmodified Bitcoin Core inside your browser.</p>
+<p class="note"><strong>Two separate trust boundaries.</strong> Bitcoin Core runs offline in the emulated Linux guest to decode a script or descriptor and derive its address. Funding information comes from an optional, explicit query to a third-party Esplora API; it is not independently validated blockchain consensus.</p>
+<section class="card">
+<h2>1 · Enter public contract data</h2>
+<label for="contract_input">Witness script HEX, raw(script) descriptor, or Bitcoin Core output descriptor</label>
+<textarea id="contract_input" spellcheck="false" autocomplete="off" placeholder="Paste witnessScript HEX or raw(HEX)#checksum, or a non-ranged output descriptor"></textarea>
+<div class="row">
+<div><label for="network">Bitcoin network</label><select id="network"><option value="main">Mainnet</option><option value="signet">Signet</option><option value="testnet4">Testnet4</option><option value="testnet">Testnet3</option></select></div>
+<div><button id="verify">Verify with Bitcoin Core</button></div>
+</div>
+<div class="row" style="margin-top:16px">
+<button type="button" id="example_human" class="secondary">Load human contract A (777 blocks)</button>
+<button type="button" id="example_human_mirror" class="secondary">Load mirror contract B (777 blocks)</button>
+<button type="button" id="example_agent" class="secondary">Load public agent sample (144 blocks, 2-of-2)</button>
+</div>
+<p class="muted"><small>Samples are public test vectors from the HODLXXI repository. The human contract examples have documented historical funding outpoints, not a guarantee of current unspent balances; the declared agent sample is not a funding proof.</small></p>
+<p class="muted"><small>Do not paste private keys, xprvs, WIF, wallet.dat, seed phrases, or secret descriptors. This tool is for public material only. To inspect OP_IF / OP_ELSE branches, provide complete witnessScript HEX or raw(HEX)#checksum. A P2WSH address or addr(...) descriptor does not reveal its script.</small></p>
+</section>
+<section class="card" aria-live="polite">
+<h2>2 · Offline Bitcoin Core validation</h2>
+<div id="machine_status" class="status">Starting the offline Linux guest…</div>
+<div id="verify_status" class="status">Waiting for input.</div>
+<div id="result" hidden><dl id="facts"></dl><h3>Bitcoin Core response</h3><pre id="core_response"></pre></div>
+</section>
+<section class="card">
+<h2>3 · External funding lookup (optional)</h2>
+<p class="muted">Only pressing the button below transmits the derived public Bitcoin address to mempool.space. Your IP address is visible to that service. The lookup does not run inside Bitcoin Core, and API results are not proof of consensus validity.</p>
+<button id="fund" class="secondary" disabled>Check address on mempool.space</button>
+<div id="funding_status" class="status">First verify an address above.</div>
+<div id="funding_result" hidden><dl id="funding_facts"></dl><h3>Current UTXOs (API-reported)</h3><div id="utxos"></div><h3>Recent transactions (API-reported, up to 25)</h3><div id="history"></div></div>
+</section>
+<details><summary>Guest serial console (diagnostics)</summary><pre id="serial"></pre></details>
+<footer>Unmodified Bitcoin Core inside v86_64 · no wallet · no guest network device · no keys stored. This page provides inspection, not spending authorization or a guarantee of future spendability. Script structure alone does not prove control of the relevant private keys.</footer>
+</main>
+<script>
+"use strict";
+const GUEST_SCRIPT = "#!/bin/sh\n# Input reaches the guest only via the 9p share. There is no network device.\nM=/mnt\nD=/tmp/btc-contract-verifier\nCHAIN=$1\nMODE=$2\nJ=$M/$3\nJOB=$4\nLD=\"$M/ld-linux-x86-64.so.2 --library-path $M\"\nCLI=\"$LD $M/bitcoin-cli -datadir=$D -chain=$CHAIN\"\nfinish() { sync; printf '@@CONTRACT_DONE:%s:%s@@\\n' \"$JOB\" \"$1\"; exit \"$1\"; }\nif ! $CLI getblockchaininfo >/dev/null 2>&1; then\n    ip link set lo up 2>/dev/null || ifconfig lo up 2>/dev/null\n    mkdir -p \"$D\"\n    $LD \"$M/bitcoind\" -datadir=\"$D\" -chain=\"$CHAIN\" -disablewallet \\\n        -networkactive=0 -connect=0 -listen=0 -dnsseed=0 -listenonion=0 \\\n        -dbcache=16 -maxmempool=5 -par=1 -server=1 -printtoconsole=0 \\\n        >\"$D/bitcoind.out\" 2>&1 &\n    pid=$!\n    i=0\n    until $CLI getblockchaininfo >/dev/null 2>&1; do\n        i=$((i+1))\n        if ! kill -0 \"$pid\" 2>/dev/null || [ \"$i\" -gt 180 ]; then\n            cat \"$D/bitcoind.out\" >\"$J.error\"\n            finish 1\n        fi\n        sleep 1\n    done\nfi\nif [ \"$MODE\" = script ]; then\n    $CLI -stdin decodescript <\"$J.input\" >\"$J.decoded.json\" 2>\"$J.error\"\n    rc=$?\nelif [ \"$MODE\" = raw_descriptor ]; then\n    # Bitcoin Core must validate the complete descriptor, including an optional checksum.\n    $CLI -stdin getdescriptorinfo <\"$J.input\" >\"$J.info.json\" 2>\"$J.error\"\n    rc=$?\n    if [ \"$rc\" -eq 0 ]; then\n        $CLI -stdin decodescript <\"$J.script\" >\"$J.decoded.json\" 2>\"$J.error\"\n        rc=$?\n    fi\nelif [ \"$MODE\" = descriptor ]; then\n    $CLI -stdin getdescriptorinfo <\"$J.input\" >\"$J.info.json\" 2>\"$J.error\"\n    rc=$?\n    if [ \"$rc\" -eq 0 ]; then\n        $CLI -stdin deriveaddresses <\"$J.input\" >\"$J.addresses.json\" 2>\"$J.derive.error\"\n    fi\nelse\n    echo \"Unsupported verification mode\" >\"$J.error\"\n    rc=2\nfi\nfinish \"$rc\"\n";
+const ALPINE_ISO = "../images/alpine-virt-3.19.9-x86_64.iso";
+const ALPINE_BOOT = "../images/alpine-virt-3.19.9-x86_64/boot/";
+const BITCOIN_DIR = "../images/bitcoin/";
+const $ = id => document.getElementById(id);
+const enc = text => new TextEncoder().encode(text);
+const dec = bytes => new TextDecoder().decode(bytes);
+let emulator, guestState = "boot", binaries, manifest, current = null, sequence = 0;
+let tail = "", line = "", serialLog = "", verifiedAddress = null, verifiedNetwork = null;
+let verificationRevision = 0; // invalidate stale verification/UI and asynchronous API replies
+let readPending = false;
+const status = (id, message, kind = "") => { const el = $(id); el.textContent = message; el.className = "status " + kind; };
+const addFact = (target, name, value) => {
+    const dt = document.createElement("dt"), dd = document.createElement("dd");
+    dt.textContent = name; dd.textContent = String(value); $(target).append(dt, dd);
+};
+const hexBytes = str => Uint8Array.from(str.match(/../g), h => parseInt(h, 16));
+const hexStr = bytes => Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+function publicInput(text) {
+    if (!text || text.length > 20000) throw Error("Provide one script/descriptor, up to 20,000 characters.");
+    if (/(xprv|tprv|vprv|uprv|yprv|zprv)/i.test(text) || /(?:^|[^A-Za-z0-9])[5KL][1-9A-HJ-NP-Za-km-z]{50,51}(?:$|[^A-Za-z0-9])/.test(text))
+        throw Error("Potentially sensitive material detected. Use public descriptors or witnessScript HEX only.");
+    if (/^[0-9a-fA-F]+$/.test(text)) {
+        if (text.length % 2 || text.length > 20000) throw Error("Witness script must contain whole hex bytes (max 10 KB).");
+        return "script";
+    }
+    if (/^raw\(([0-9a-fA-F]{2})+\)(?:#[a-z0-9]{8})?$/.test(text)) return "raw_descriptor";
+    if (!/^[a-z_]+\(/.test(text) || /[\r\n]/.test(text)) throw Error("Expected witnessScript HEX or one Bitcoin Core output descriptor.");
+    if (/[\\'";$]/.test(text)) throw Error("Unexpected character in descriptor.");
+    return "descriptor";
+}
+// The HODLXXI template is checked separately from Bitcoin Core's generic decodescript.
+// Reject malformed/ambiguous encodings rather than guessing which pubkey owns which CLTV.
+function parseTemplate(bytes) {
+    let p=0;
+    const next=() => { if (p>=bytes.length) throw Error("Truncated script"); return bytes[p++]; };
+    const op=(expected) => { if(next()!==expected) throw Error("Not an exact HODLXXI contract template"); };
+    const pubkey=() => {
+        if(next()!==33 || p+33>bytes.length) throw Error("Expected direct 33-byte compressed public key");
+        const key=bytes.slice(p,p+33); p+=33;
+        if(key[0]!==2 && key[0]!==3) throw Error("Invalid compressed public key prefix");
+        return hexStr(key);
+    };
+    const height=() => {
+        const code=next();
+        if(code>=0x51 && code<=0x60) return code-0x50;
+        if(code<1 || code>5 || p+code>bytes.length) throw Error("Unsupported CLTV ScriptNum encoding");
+        const v=bytes.slice(p,p+code);p+=code;
+        if(v.length===1 && v[0]>=1 && v[0]<=16) throw Error("Nonminimal ScriptNum");
+        if((v[v.length-1]&0x7f)===0 && (v.length===1 || !(v[v.length-2]&0x80)))
+            throw Error("Nonminimal ScriptNum encoding");
+        if(v[v.length-1]&0x80) throw Error("Negative CLTV ScriptNum");
+        let h=0;for(let i=0;i<v.length;i++)h+=v[i]*2**(8*i);
+        if(!Number.isSafeInteger(h)||h<=0||h>=500000000) throw Error("Expected a positive CLTV block height");
+        return h;
+    };
+    const branch=()=>{
+        const lock=height();op(0xb1);op(0x75);const key=pubkey();op(0xac);
+        return {lock,pubkey:key};
+    };
+    op(0x63);
+    let cooperative=[];
+    if(bytes[p]===0x52) {
+        op(0x52);
+        cooperative=[pubkey(),pubkey()];
+        op(0x52);op(0xae);op(0x67);op(0x63);
+    }
+    const ifBranch=branch();
+    op(0x67);const elseBranch=branch();
+    op(0x68);
+    if(cooperative.length)op(0x68);
+    if(p!==bytes.length) throw Error("Trailing script bytes");
+    if(ifBranch.pubkey===elseBranch.pubkey) throw Error("Identical unilateral participants");
+    if(elseBranch.lock<=ifBranch.lock) throw Error("Sender locktime must be later than receiver locktime");
+    if(cooperative.length) {
+        const same=cooperative.length===2 && cooperative[0]!==cooperative[1] &&
+            cooperative.slice().sort().join("|")===[ifBranch.pubkey,elseBranch.pubkey].sort().join("|");
+        if(!same)throw Error("Cooperative 2-of-2 keys must match both unilateral participants");
+    }
+    return {
+        family:cooperative.length?"cooperative_2_of_2_cltv":"cltv_only",
+        ifBranch,elseBranch,cooperative,delta:elseBranch.lock-ifBranch.lock
+    };
+}
+function lockText(v) {
+    return v < 500000000 ? "block " + v : new Date(v*1000).toISOString();
+}
+async function sha256hex(data) {
+    if (!crypto.subtle) return null;
+    return hexStr(new Uint8Array(await crypto.subtle.digest("SHA-256", data)));
+}
+async function loadBinaries() {
+    const response = await fetch(BITCOIN_DIR + "manifest.json");
+    if (!response.ok) throw Error("Bitcoin Core manifest missing; first run scripts/setup.sh.");
+    manifest = await response.json();
+    for (const f of manifest.files) {
+        const r = await fetch(BITCOIN_DIR + f.name);
+        if (!r.ok) throw Error("Failed to fetch Bitcoin Core binary: " + f.name);
+        const data = new Uint8Array(await r.arrayBuffer());
+        const hash = await sha256hex(data);
+        if (!hash || hash !== f.sha256) throw Error("Bitcoin Core binary integrity check unavailable or failed: " + f.name);
+        await emulator.create_file("/" + f.name, data);
+    }
+    await emulator.create_file("/contract-verify.sh", enc(GUEST_SCRIPT));
+}
+function offlineFiles(opts) { return window.offline_bundle ? offline_bundle.v86_options(opts) : opts; }
+function startMachine() {
+    emulator = new V86(offlineFiles({
+        wasm_path:"../v86_64/build/v86.wasm", memory_size:1024*1024*1024, vga_memory_size:8*1024*1024,
+        bios:{url:"../v86_64/bios/seabios.bin"}, vga_bios:{url:"../v86_64/bios/vgabios.bin"},
+        cdrom:{url:ALPINE_ISO,async:true}, bzimage:{url:ALPINE_BOOT+"vmlinuz-virt"},
+        initrd:{url:ALPINE_BOOT+"initramfs-virt"},
+        cmdline:"console=tty0 console=ttyS0,115200 modules=loop,squashfs,sd-mod,usb-storage quiet",
+        filesystem:{}, net_device:{type:"none"}, autostart:true, disable_keyboard:true,disable_mouse:true
+    }));
+    binaries = loadBinaries().catch(e => {
+        guestState = "dead"; status("machine_status",e.message,"bad"); throw e;
+    });
+    emulator.add_listener("serial0-output-byte", byte => {
+        const ch = String.fromCharCode(byte);
+        serialLog += ch; if (serialLog.length > 200000) serialLog = serialLog.slice(-150000);
+        if (!readPending) {
+            readPending = true;
+            requestAnimationFrame(() => { readPending=false; $("serial").textContent=serialLog.replace(/\x1b\[[0-9;?]*[A-Za-z]|\r/g,""); });
+        }
+        tail = (tail + ch).slice(-3000);
+        if (ch === "\n") {
+            const one = line.replace(/\r/g,""); line = "";
+            const match = /^@@CONTRACT_DONE:(\d+):(\d+)@@$/.exec(one);
+            if (match && current && current.id === Number(match[1])) finishJob(Number(match[2]));
+        } else { line = (line + ch).slice(-2000); }
+        if (guestState === "boot" || guestState === "login" || guestState === "mount") checkPrompts();
+    });
+    emulator.add_listener("emulator-ready", () => status("machine_status","Alpine Linux is booting; fetching sha256-verified Bitcoin Core…"));
+}
+function checkPrompts() {
+    const t = tail.replace(/\r/g,"");
+    if (guestState === "boot" && /login: $/.test(t)) {
+        guestState = "login"; status("machine_status","Logging in to the offline guest…");
+        emulator.serial0_send("root\n");
+    } else if (guestState === "login" && /:~# $/.test(t)) {
+        guestState = "mount"; status("machine_status","Mounting the guest share; Bitcoin Core binaries loading…");
+        binaries.then(() => emulator.serial0_send("modprobe 9pnet_virtio; modprobe 9p; mount -t 9p -o trans=virtio,version=9p2000.L,cache=loose host9p /mnt && chmod 755 /mnt/ld-linux-x86-64.so.2 /mnt/bitcoin* && echo @@MOU''NTED@@\n"), () => {});
+    } else if (guestState === "mount" && t.includes("@@MOUNTED@@")) {
+        guestState = "ready"; tail = ""; line = "";
+        status("machine_status","Ready · offline Bitcoin Core guest · no network device","ok");
+        runJob();
+    }
+}
+function resetVerifiedAddress() {
+    verificationRevision++;
+    verifiedAddress=null; verifiedNetwork=null; $("fund").disabled=true;
+    $("result").hidden=true; $("funding_result").hidden=true;
+    status("funding_status","Not checked. Verify the current public input before querying any address.");
+}
+function inputChanged() {
+    resetVerifiedAddress();
+    if (!current) status("verify_status","Input or network changed. Run Verify again.");
+}
+function startVerify() {
+    try {
+        const input = $("contract_input").value.trim();
+        const mode = publicInput(input);
+        if (guestState === "dead") throw Error("Guest startup failed. Reload after correcting the error.");
+        if (current) throw Error("Verification is already running.");
+        resetVerifiedAddress();
+        current = {id:++sequence,input,mode,network:$("network").value,dispatched:false,revision:verificationRevision};
+        status("verify_status",guestState==="ready"?"Running Bitcoin Core…":"Queued until the offline guest finishes booting…");
+        runJob();
+    } catch (e) {status("verify_status",e.message,"bad");}
+}
+async function runJob() {
+    const job = current;
+    if (!job || job.dispatched || guestState !== "ready") return;
+    job.dispatched = true; guestState="busy";
+    status("verify_status","Checking " + job.mode + " with unmodified Bitcoin Core (initial node startup may take a minute)…");
+    try {
+        await emulator.create_file("/contract-" + job.id + ".input", enc(job.input+"\n"));
+        if (job.mode==="raw_descriptor") {
+            const hex=job.input.match(/^raw\(([0-9a-fA-F]+)\)/)[1];
+            await emulator.create_file("/contract-" + job.id + ".script", enc(hex+"\n"));
+        }
+        emulator.serial0_send("sh /mnt/contract-verify.sh " + job.network + " " + job.mode + " contract-" + job.id + " " + job.id + "\n");
+    } catch(e) {
+        current=null; guestState="ready"; status("verify_status",e.message,"bad");
+    }
+}
+async function readOutput(path) {
+    try {return dec(await emulator.read_file("/"+path));} catch(e) {return "";}
+}
+async function finishJob(rc) {
+    const job = current; if (!job) return;
+    current=null; guestState="ready";
+    const prefix="contract-"+job.id;
+    const [decodedText,infoText,addressesText,error,deriveError]=await Promise.all([
+        readOutput(prefix+".decoded.json"),readOutput(prefix+".info.json"),
+        readOutput(prefix+".addresses.json"),readOutput(prefix+".error"),readOutput(prefix+".derive.error")
+    ]);
+    if (job.revision!==verificationRevision ||
+        job.input!==$("contract_input").value.trim() || job.network!==$("network").value) {
+        status("verify_status","Input changed while Bitcoin Core was checking. Verify the new input again.");
+        return;
+    }
+    if (rc !== 0) {
+        status("verify_status","Bitcoin Core rejected the input: "+(error || "see serial console"),"bad");
+        return;
+    }
+    try {
+        const isScript=job.mode==="script"||job.mode==="raw_descriptor";
+        const response = JSON.parse(isScript?decodedText:infoText);
+        const descriptorInfo=job.mode==="raw_descriptor"?JSON.parse(infoText):null;
+        const derived = isScript ? response.segwit?.address :
+            ((() => {try {const a=JSON.parse(addressesText);return Array.isArray(a)&&a.length===1?a[0]:null;}catch(e){return null;}})());
+        if (!derived && isScript) throw Error("Bitcoin Core did not produce a native SegWit address; cannot claim P2WSH.");
+        $("facts").textContent=""; $("result").hidden=false;
+        addFact("facts","Network",job.network);
+        addFact("facts","Input type",job.mode==="script"?"Witness script (HEX)":job.mode==="raw_descriptor"?"Raw script descriptor (not a P2WSH output descriptor)":"Output descriptor");
+        if (isScript) {
+            addFact("facts","Bitcoin Core ASM",response.asm || "(none)");
+            const scriptHex=job.mode==="script"?job.input:job.input.match(/^raw\(([0-9a-fA-F]+)\)/)[1];
+            const hash=await sha256hex(hexBytes(scriptHex));
+            if (job.revision!==verificationRevision) throw Error("Input changed during verification; please re-run.");
+            if (!hash) throw Error("SHA256 not supported in this browser");
+            if (response.segwit?.hex?.toLowerCase() !== "0020"+hash)
+                throw Error("Bitcoin Core SegWit witness program does not match independently hashed script");
+            addFact("facts","P2WSH scriptPubKey","0020"+hash);
+            if (descriptorInfo) addFact("facts","Bitcoin Core descriptor checksum",descriptorInfo.checksum || "(none)");
+            if (hash) addFact("facts","Witness script SHA256",hash);
+            try {
+                const matched=parseTemplate(hexBytes(scriptHex));
+                addFact("facts","HODLXXI template",matched.family+" · exact byte-level syntax match (not a spendability proof)");
+                addFact("facts","CLTV delta",matched.delta+" blocks"+(matched.delta===777?" · legacy_777 human profile":matched.delta===144?" · current_144 interval":" · nonstandard profile"));
+                if (matched.cooperative.length) addFact("facts","Cooperative path","2-of-2 immediate branch: "+matched.cooperative.join(" + "));
+                addFact("facts","OP_IF pubkey",matched.ifBranch.pubkey);
+                addFact("facts","OP_IF CLTV",lockText(matched.ifBranch.lock));
+                addFact("facts","OP_ELSE pubkey",matched.elseBranch.pubkey);
+                addFact("facts","OP_ELSE CLTV",lockText(matched.elseBranch.lock));
+                addFact("facts","Timelock order",matched.ifBranch.lock<=matched.elseBranch.lock?"IF not later than ELSE":"IF later than ELSE — inspect contract intent");
+                addFact("facts","CLTV condition","Requires valid signature, matching nLockTime type and non-final nSequence");
+            } catch(e) {addFact("facts","HODLXXI template","Not recognized: "+e.message+" (Bitcoin Core decodes scripts without proving spendability)");}
+        } else {
+            addFact("facts","Descriptor checksum",response.checksum || "none");
+            addFact("facts","Ranged descriptor",String(response.isrange));
+            if (!derived) addFact("facts","Address derivation","Unavailable: "+(deriveError||"Bitcoin Core did not derive exactly one address").trim());
+            addFact("facts","Script inspection","Descriptor validated only; address descriptors cannot disclose hidden scripts");
+        }
+        if (derived) {
+            const prefixOk=job.network==="main" ? derived.startsWith("bc1") || /^[13]/.test(derived):
+                derived.startsWith("tb1") || /^[mn2]/.test(derived);
+            if (!prefixOk) throw Error("Derived address does not match selected network");
+            addFact("facts","Derived address",derived);
+            verifiedAddress=derived;verifiedNetwork=job.network;$("fund").disabled=false;
+        }
+        $("core_response").textContent=JSON.stringify(isScript&&descriptorInfo?{descriptorInfo,decodedScript:response}:response,null,2);
+        status("verify_status",derived?"Bitcoin Core decoded the input and derived an address. This is not a spendability proof; funding has NOT been checked.":"Bitcoin Core validated the descriptor, but a single address could not be derived.","ok");
+    } catch(e) {status("verify_status","Could not interpret Bitcoin Core result: "+e.message,"bad");}
+}
+const apiBase={
+    main:"https://mempool.space/api",
+    signet:"https://mempool.space/signet/api",
+    testnet4:"https://mempool.space/testnet4/api",
+    testnet:"https://mempool.space/testnet/api"
+};
+async function fetchJson(url) {
+    const res=await fetch(url,{headers:{Accept:"application/json"},cache:"no-store"});
+    if(!res.ok) throw Error("External Esplora HTTP "+res.status);
+    return res.json();
+}
+const formatBtc=sats=>(sats/100000000).toFixed(8)+" BTC";
+function renderTable(node,head,rows) {
+    node.textContent="";
+    const t=document.createElement("table"),thead=document.createElement("thead"),tr=document.createElement("tr");
+    head.forEach(h=>{const th=document.createElement("th");th.textContent=h;tr.append(th);});
+    thead.append(tr);t.append(thead);
+    const tb=document.createElement("tbody");
+    for(const cols of rows) {
+        const row=document.createElement("tr");
+        for(const c of cols){const td=document.createElement("td");td.textContent=String(c);row.append(td);}
+        tb.append(row);
+    }
+    t.append(tb);node.append(t);
+}
+async function checkFunding() {
+    const addr=verifiedAddress,chain=verifiedNetwork,revision=verificationRevision;
+    if(!addr || !chain || $("fund").disabled) return;
+    $("fund").disabled=true; $("funding_result").hidden=true;
+    status("funding_status","Querying mempool.space; results are external API reports, not independently verified…");
+    try {
+        const base=apiBase[chain]+"/address/"+encodeURIComponent(addr);
+        const [utxos,history]=await Promise.all([fetchJson(base+"/utxo"),fetchJson(base+"/txs")]);
+        if(revision!==verificationRevision || addr!==verifiedAddress || chain!==verifiedNetwork) return;
+        if(!Array.isArray(utxos)||!Array.isArray(history)) throw Error("Unexpected API response");
+        const confirmed=utxos.filter(x=>x.status?.confirmed),unconfirmed=utxos.filter(x=>!x.status?.confirmed);
+        const sum=a=>a.reduce((n,x)=>n+x.value,0);
+        if(utxos.some(x=>!Number.isSafeInteger(x.value)||x.value<0)) throw Error("Invalid UTXO value from API");
+        $("funding_facts").textContent="";
+        addFact("funding_facts","Data source","mempool.space · Esplora API · "+chain);
+        addFact("funding_facts","Queried at",new Date().toISOString());
+        addFact("funding_facts","Confirmed UTXOs",confirmed.length);
+        addFact("funding_facts","Confirmed unspent",formatBtc(sum(confirmed)));
+        addFact("funding_facts","Unconfirmed UTXOs",unconfirmed.length);
+        addFact("funding_facts","Unconfirmed unspent",formatBtc(sum(unconfirmed)));
+        addFact("funding_facts","History","Most recent "+history.length+" transactions returned (not necessarily complete)");
+        renderTable($("utxos"),["Transaction ID","Vout","Value","Confirmation"],utxos.map(x=>[x.txid,x.vout,formatBtc(x.value),x.status?.confirmed?"block "+x.status.block_height:"unconfirmed"]));
+        renderTable($("history"),["Transaction ID","Status"],history.slice(0,25).map(x=>[x.txid,x.status?.confirmed?"confirmed":"unconfirmed"]));
+        $("funding_result").hidden=false;
+        status("funding_status","API query completed · address history and UTXOs are externally reported","ok");
+    } catch(e){if(revision===verificationRevision)status("funding_status",e.message+" · No independent funding verification performed.","bad");}
+    finally { if(revision===verificationRevision && addr===verifiedAddress) $("fund").disabled=false; }
+}
+async function loadPublicExample(index) {
+    if (current) { status("verify_status","Wait for the current verification to finish."); return; }
+    try {
+        const r=await fetch("../tests/fixtures/public-contract-vectors.json",{cache:"no-store"});
+        if(!r.ok)throw Error("Could not load local public examples: HTTP "+r.status);
+        const payload=await r.json();
+        if(payload.schema!=="hodlxxi.contract_verifier_public_vectors.v1")throw Error("Unexpected fixture schema");
+        const vector=payload.vectors[index];
+        if(!vector)throw Error("Missing public fixture");
+        $("contract_input").value=vector.raw_descriptor||vector.script_hex;
+        $("network").value=vector.network;
+        resetVerifiedAddress();
+        status("verify_status","Loaded "+vector.name+". Press Verify with Bitcoin Core to test locally.");
+    }catch(e){status("verify_status",e.message,"bad");}
+}
+$("example_human").addEventListener("click",()=>loadPublicExample(0));
+$("example_human_mirror").addEventListener("click",()=>loadPublicExample(1));
+$("example_agent").addEventListener("click",()=>loadPublicExample(2));
+$("contract_input").addEventListener("input",inputChanged);
+$("network").addEventListener("change",inputChanged);
+$("verify").addEventListener("click",startVerify);
+$("fund").addEventListener("click",checkFunding);
+window.onload=()=> (window.offline_bundle?window.offline_bundle.ready:Promise.resolve()).then(startMachine).catch(e=>status("machine_status",e.message,"bad"));
+</script>
+</body></html>

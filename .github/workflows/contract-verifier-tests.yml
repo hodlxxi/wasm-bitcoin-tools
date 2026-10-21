@@ -1,0 +1,29 @@
+# Lightweight, offline regression checks. This does not boot Bitcoin Core or query an API.
+name: Contract Verifier V1
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "apps/contract-verifier.html"
+      - "tests/contract-verifier.test.mjs"
+      - "tests/fixtures/public-contract-vectors.json"
+      - ".github/workflows/contract-verifier-tests.yml"
+  push:
+    branches: ["feat/contract-verifier-v1"]
+    paths:
+      - "apps/contract-verifier.html"
+      - "tests/contract-verifier.test.mjs"
+      - "tests/fixtures/public-contract-vectors.json"
+      - ".github/workflows/contract-verifier-tests.yml"
+permissions:
+  contents: read
+jobs:
+  public-fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Run public contract and P2WSH regression vectors
+        run: node --test tests/contract-verifier.test.mjs

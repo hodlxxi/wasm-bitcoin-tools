@@ -1,0 +1,177 @@
+# HODLXXI Bitcoin Contract Verifier V1 — Development / Review Only
+
+Status: **Development-tested public-data beta, not production-certified or full-node consensus verification.** This tool reuses the public
+`wasm-bitcoin-tools` v86_64 guest and unmodified, offline Bitcoin Core.
+Only the browser page may make an **explicitly user-triggered** call to
+`mempool.space` (Esplora); Bitcoin Core itself has no network device.
+
+## Public examples (no private keys)
+
+The test vectors at `tests/fixtures/public-contract-vectors.json` are
+reproducible from the publicly disclosed HODLXXI project:
+
+- **Human, legacy_777:** two mirrored `cltv_only` P2WSH witness scripts;
+  the two heights on each leg differ by **777 blocks**. Exact script bytes and
+  mainnet witness-script hashes are sourced from
+  [the project unit test](https://github.com/hodlxxi/Universal-Bitcoin-Identity-Layer/blob/main/tests/unit/test_mirrored_covenant_pair.py).
+  The public bootstrap manifest historically records precise funding outpoints,
+  but these must not be presented as **currently** unspent without a fresh
+  blockchain query.
+- **Operator ↔ agent, current_144:** an outer `OP_IF` branch contains
+  `2 <agent> <operator> 2 OP_CHECKMULTISIG`. The outer `OP_ELSE`
+  contains an inner `OP_IF / OP_ELSE` with unilateral CLTV exits at
+  **1,777,777** (agent) and **1,777,921** (operator), respectively.
+  Source: [the public covenant artifact](https://github.com/hodlxxi/Universal-Bitcoin-Identity-Layer/blob/main/app/data/trust/covenant_hodlxxi-herald-covenant-v1.json).
+  Its published status is **unfunded_declared**, not a funding proof.
+
+The precise CRT profile distinction is documented in
+[CRT Covenant Profile V1](https://github.com/hodlxxi/Universal-Bitcoin-Identity-Layer/blob/main/docs/CRT_COVENANT_PROFILE_V1.md).
+**Do not quietly rewrite the historical human 777-block legs as 144-block
+legs.** The 144-block profile shown in this snapshot is for operator-agent
+continuity and does not confer human membership or authorization.
+
+## Trust and verification layers
+
+1. **Input acceptance:** use *public* witnessScript hex, a `raw(HEX)` script
+   descriptor optionally with checksum, or an ordinary Bitcoin Core output
+   descriptor. The page is not designed to handle wallet files or private keys.
+2. **Offline Core decode:** `decodescript` decodes the script and builds a
+   P2WSH witness output, or `getdescriptorinfo` parses a descriptor.
+   A `raw(HEX)` *output* descriptor describes a raw scriptPubKey in Core;
+   **we additionally interpret its embedded bytes as a candidate witnessScript**
+   for this HODLXXI inspector. This is not identical to `wsh(raw(...))`,
+   which is **not a valid output-descriptor form**.
+   For `raw(HEX)#checksum`, the full input (including checksum) is submitted
+   to Core's `getdescriptorinfo` first; the extracted HEX then goes to
+   `decodescript`.
+3. **Two-branch semantic inspection:** an exact, conservative byte-level
+   template recognizer identifies the two supported structures above.
+   Unrecognized scripts can still be decoded, but must not be labeled
+   HODLXXI-conformant. Even a recognized template does **not** prove the
+   pubkeys are controlled by participants, signatures exist, the transaction
+   will be spendable, or full CRT membership conditions are met.
+4. **Derivation:** the browser hashes raw script bytes independently with
+   SHA256 and compares `0020<hash>` to the output returned by Bitcoin Core's
+   `decodescript.segwit.hex`. It displays the corresponding address.
+5. **Optional external UTXO/history lookup:** only pressing **Check address
+   on mempool.space** sends the public address to that third party via an
+   Esplora-compatible API. It reports current UTXOs, confirmation status,
+   and at most 25 recent transactions returned by that API. The result is
+   **not independent Bitcoin consensus proof**, and the outside service
+   can observe the caller's IP and requested public address. The guest itself
+   has no network adapter. A local full node remains the higher-assurance
+   source of UTXO state.
+
+For P2WSH, CLTV does not automatically guarantee future spendability;
+Script execution depends on branch choice, signatures, nLockTime type/value,
+input nSequence and Bitcoin consensus validity at broadcast time.
+
+## Recorded external funding snapshot (not a consensus proof)
+
+On **2026-10-21 03:13:37 UTC**, a read-only GitHub Actions runner queried
+**mempool.space** and **Blockstream.info** directly for the three public
+P2WSH contract addresses. Both API sources returned matching balance totals
+and exact confirmed outpoint collections for the human mirrored pair:
+
+| Public contract | Current confirmed UTXOs reported | Confirmed unspent balance |
+| --- | ---: | ---: |
+| Human legacy_777 leg A (`bc1qqkkh…`) | 3 | **300,000 sats (0.003 BTC)** |
+| Human legacy_777 leg B (`bc1qrj4k…`) | 2 | **300,000 sats (0.003 BTC)** |
+| Operator–agent current_144 (`bc1qsrpj…`) | 0 | **0 sats** |
+
+Detailed confirmed outpoints reported for leg A:
+`133129 + 44648 + 122223 = 300000 sats`.
+For leg B:
+`177777 + 122223 = 300000 sats`.
+
+This **300,000 satoshi amount must not be confused with 300 satoshis**.
+Each human address had a matching on-chain `chain_stats` balance of
+300,000 sats with no unconfirmed UTXOs in these snapshots.
+The agent address had no transaction history reported at the time.
+
+[GitHub Actions read-only probe and full logs](https://github.com/hodlxxi/wasm-bitcoin-tools/actions/runs/39537388596).
+
+These are time-bound external API reports, **not proof that amounts remain
+unspent at a later time** and not full-node consensus verification.
+Script→hash→address linkage was separately verified using the public
+witnessScript bytes. No HODLXXI server, wallets, credentials, or private keys
+were used.
+
+## Automated tests
+
+`node --test tests/contract-verifier.test.mjs` runs without a node, wallet,
+Internet connection, or private keys:
+
+- Validated fixture parsing for both human legs and the operator-agent leg.
+- Independent SHA256 of the exact witnessScript bytes, known hashes, and
+  test-side BIP173 address encoding against published mainnet addresses.
+- Input rejection of secrets and malformed/altered templates.
+- Browser JavaScript syntax check and presence of offline guest controls.
+
+The workflow `.github/workflows/contract-verifier-tests.yml` runs those
+tests on the PR. **Passing this unit suite is not equivalent to browser
+integration or Core RPC testing.**
+
+## Real browser integration evidence
+
+On **2026-10-21**, GitHub Actions
+[Contract Verifier Browser Acceptance](https://github.com/hodlxxi/wasm-bitcoin-tools/actions/runs/39550454738)
+built the upstream `v86_64` emulator, booted actual Alpine Linux in headless
+Chrome through its byte-range-capable HTTP server, started the official
+**Bitcoin Core 31.1** guest with networking disabled, and executed
+`decodescript` / `getdescriptorinfo` against all **three** real public
+HODLXXI fixtures:
+
+- Human A, legacy_777: correct Core-derived P2WSH address and timelock delta.
+- Mirrored human B, legacy_777: correct independent address and delta.
+- Operator-agent, current_144: correct public `raw(...)` descriptor parsing,
+  2-of-2 cooperative path and Core-derived P2WSH address.
+- The browser displayed the *mock* 300,000-sat UTXO API balance only after
+  explicitly clicking the lookup button, displayed zero for the mocked
+  unfunded agent address, and invalidated a previously verified address
+  when the user edited the input.
+
+**Browser API responses in this run were deliberately mocked** to test
+opt-in behavior and UI transitions deterministically. Separate
+[real two-source Esplora checks](https://github.com/hodlxxi/wasm-bitcoin-tools/actions/runs/39537461170)
+confirmed 300,000 sats at each human address and zero at the agent address
+at that snapshot time. Neither test substitutes for independent full-node
+consensus validation.
+
+This automated pass establishes a reproducible browser **development smoke
+test**, not an audit of all consensus/script edge cases, device compatibility
+or the eventual GitHub Pages deployment.
+
+## Browser acceptance and remaining deployment gates
+
+1. Build the complete site with the upstream `scripts/setup.sh` flow on
+   supported x86_64 Linux, with Bitcoin Core integrity checks enabled.
+2. Open the fourth tool and load each public example; confirm actual guest
+   boot, Core RPC return, decoded ASM, exact P2WSH hashes and published
+   addresses (especially `bc1qsrpjjn3w8ly8da7u59y7ywzly4he7lfnl8462qrxp3d368gexess3tjdz3`
+   for the agent declaration).
+3. Confirm the `raw(HEX)#checksum` path validates the checksum and then
+   decodes the witnessScript (not mistakenly using raw output-descriptor
+   derivation as the P2WSH address).
+4. Confirm corrupt inputs, secret-bearing descriptors, wrong network and
+   Core startup errors fail visibly and do not enable funding lookups.
+5. Confirm browser network requests are **not made** until a human explicitly
+   requests UTXO lookup. Check CORS, API errors, timeouts, stale responses,
+   confirmed vs unconfirmed classifications, and no-address cases.
+6. Reconcile results against a trusted full Bitcoin node. Avoid claiming
+   that historical public bootstrap outpoints are currently unspent based
+   solely on fixture data.
+7. Security review (DOM injection, shell interpolation, guest frame
+   spoofing, large input, resource limits, privacy) and regression testing
+   of the original three tools.
+
+**Deployment boundary:** only promote a commit with green unit, actual
+v86/Bitcoin Core browser checks, and all four offline build checks. The
+[CI run at this tested version](https://github.com/hodlxxi/wasm-bitcoin-tools/actions/runs/39550818069)
+passed the full static site build, all four checksum-verified single-file
+offline builds, and Chrome verification of the two live human scripts and
+the declared operator-agent script. A successful production GitHub Pages
+publish is a separate final deployment gate. Public beta users must still
+treat the funding API as an externally reported observation, never a local
+consensus proof; a professional security audit and broad device coverage
+are not claimed.
