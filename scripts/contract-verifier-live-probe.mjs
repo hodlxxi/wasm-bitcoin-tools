@@ -64,10 +64,14 @@ for(const v of fixture.vectors) {
  }
  if(snapshots.length===2){
   const [a,b]=snapshots;
-  if(a.confirmed_utxo_sats!==b.confirmed_utxo_sats ||
-   a.unconfirmed_utxo_sats!==b.unconfirmed_utxo_sats){
-   console.log("  WARNING: two external providers disagree. Neither response can be treated as verified consensus.");
-  }else console.log("  EXTERNAL_SOURCES_AGREE_ON_UTXOS true (still NOT an independent consensus proof)");
+  const canonical = rows => rows.map(x=>[x.txid,x.vout,x.value_sats,x.confirmed,x.block_height].join(":")).sort();
+  const equalOutpoints = JSON.stringify(canonical(a.utxos))===JSON.stringify(canonical(b.utxos));
+  const equalStats = a.confirmed_utxo_sats===b.confirmed_utxo_sats &&
+    a.unconfirmed_utxo_sats===b.unconfirmed_utxo_sats &&
+    a.chain_stats_balance_sats===b.chain_stats_balance_sats;
+  if(!equalOutpoints || !equalStats){
+   console.log("  WARNING: external sources disagree on exact UTXOs or balances. Neither response can be treated as verified consensus.");
+  }else console.log("  EXTERNAL_SOURCES_AGREE_ON_EXACT_UTXOS true (still NOT an independent consensus proof)");
  }
  if(!snapshots.length){console.log("  UNVERIFIED no external source responded");failed++;}
 }
