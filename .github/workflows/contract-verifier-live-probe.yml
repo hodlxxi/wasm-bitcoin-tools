@@ -1,0 +1,23 @@
+# Explicitly separate from the offline unit tests: this job makes network requests
+# only for already-public Bitcoin addresses. It does not claim consensus validation.
+name: Contract Verifier External UTXO Probe
+on:
+  push:
+    branches: ["feat/contract-verifier-v1"]
+    paths:
+      - "scripts/contract-verifier-live-probe.mjs"
+      - ".github/workflows/contract-verifier-live-probe.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  esplora-observation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Observe public P2WSH UTXOs via mempool.space and Blockstream.info
+        run: node scripts/contract-verifier-live-probe.mjs
