@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>wasm-bitcoin-tools</title>
+<title>HODLXXI Bitcoin Core tools and Contract Verifier</title>
 <link rel="icon" href="v86_64/icons/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="v86_64/icons/icon-32.png" sizes="32x32" type="image/png">
 <!--
@@ -68,9 +68,8 @@ adding a tool is one entry there.
 <main>
     <header>
         <svg class="mark" viewBox="0 0 64 64" role="img" aria-label="Bitcoin"><path fill="#f7931a" d="M63.04 39.741c-4.274 17.143-21.638 27.575-38.783 23.301C7.12 58.768-3.313 41.404.962 24.262 5.234 7.117 22.597-3.317 39.737.957c17.144 4.274 27.576 21.64 23.302 38.784z"/><path fill="#fff" d="M46.11 27.441c.636-4.258-2.606-6.547-7.039-8.074l1.438-5.768-3.512-.875-1.4 5.616c-.922-.23-1.87-.447-2.812-.662l1.41-5.653-3.509-.875-1.439 5.766c-.764-.174-1.514-.346-2.242-.527l.004-.018-4.842-1.209-.934 3.75s2.605.597 2.55.634c1.422.355 1.68 1.296 1.636 2.042l-1.638 6.571c.098.025.225.061.365.117l-.37-.092-2.297 9.205c-.174.432-.615 1.08-1.609.834.035.051-2.552-.637-2.552-.637l-1.743 4.019 4.57 1.139c.85.213 1.683.436 2.502.646l-1.453 5.835 3.507.875 1.439-5.772c.958.26 1.888.5 2.798.726l-1.434 5.745 3.511.875 1.453-5.823c5.987 1.133 10.489.676 12.384-4.739 1.527-4.36-.076-6.875-3.226-8.515 2.294-.529 4.022-2.038 4.483-5.155zM38.087 38.69c-1.085 4.36-8.426 2.003-10.806 1.412l1.928-7.729c2.38.594 10.012 1.77 8.878 6.317zm1.086-11.312c-.99 3.966-7.1 1.951-9.082 1.457l1.748-7.01c1.982.494 8.365 1.416 7.334 5.553z"/></svg>
-        <h1>Bitcoin tools that run <em>Bitcoin&nbsp;Core</em> in your browser.</h1>
-        <p class="lead">Each tool boots a Linux machine, emulated in WebAssembly in the tab, and runs an unmodified, offline Bitcoin Core in
-        it. Your files never leave the browser, and the machine is gone when you close the tab.</p>
+        <h1>HODLXXI tools that run <em>Bitcoin&nbsp;Core</em> in your browser.</h1>
+        <p class="lead">Inspect public P2WSH Bitcoin contracts independently with the HODLXXI Contract Verifier, alongside three original Bitcoin Core tools. Each tool runs an unmodified Bitcoin Core in an offline WebAssembly guest. Only an optional, explicitly requested public-address lookup contacts mempool.space.</p>
         <div class="facts"><span>No network device</span><span>Official binaries, sha256-verified</span><span>x86-64 Linux in WebAssembly</span><span>Open source</span></div>
     </header>
 
@@ -83,11 +82,10 @@ adding a tool is one entry there.
     <div class="how">
         <div><b>A real machine</b>An x86-64 PC in WebAssembly (v86_64, with a 64-bit JIT) boots Alpine Linux in about half a minute.</div>
         <div><b>Real Bitcoin Core</b>The official release, checked against its sha256 and run unchanged with networking turned off.</div>
-        <div><b>Nothing leaves</b>Your file reaches the machine through a shared folder in the page; results come back the same way.</div>
+        <div><b>Offline core, optional API</b>Bitcoin Core runs offline. The Contract Verifier requests externally reported public UTXOs only when you click its funding lookup.</div>
     </div>
 
-    <footer>Source: <a href="https://github.com/portlandhodl/wasm-bitcoin-tools">wasm-bitcoin-tools</a>, with the emulator from
-    <a href="https://github.com/portlandhodl/v86_64">v86_64</a> as a submodule.</footer>
+    <footer>Source: <a href="https://github.com/hodlxxi/wasm-bitcoin-tools">HODLXXI fork with Contract Verifier</a> · Based on <a href="https://github.com/portlandhodl/wasm-bitcoin-tools">PortlandHODL’s original project</a> · Emulator: <a href="https://github.com/portlandhodl/v86_64">v86_64</a>.</footer>
 </main>
 <script>
 "use strict";
