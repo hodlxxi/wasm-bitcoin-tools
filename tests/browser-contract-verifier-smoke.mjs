@@ -63,6 +63,27 @@ try{
  if(!values.includes("0.00300000 BTC"))throw Error("Mocked API balance missing: "+values);
  if(apiRequests!==2)throw Error("Expected explicit two Esplora endpoint calls; got "+apiRequests);
  mark("opt-in Esplora mock check",values.replace(/\n/g," "));
+ // A changed input must not leave a usable stale funding address in the UI.
+ const priorInput=await page.locator("#contract_input").inputValue();
+ await page.locator("#contract_input").fill(priorInput+" ");
+ if(await page.locator("#fund").isEnabled())throw Error("Funding must be invalidated when the public script is changed");
+ if(!(await page.locator("#result").isHidden()))throw Error("Old validation should disappear after input change");
+ mark("stale funding state invalidation verified");
+ // A verifier is per contract; the second funded human mirror is a separate address.
+ await page.locator("#example_human_mirror").click();
+ await waitingForStatus("verify_status","Loaded Human mirrored leg B",15000);
+ await page.locator("#verify").click();
+ await waitingForStatus("verify_status","Bitcoin Core decoded the input and derived an address",150000);
+ values=await page.locator("#facts").innerText();
+ if(!values.includes("777 blocks") ||
+    !values.includes("bc1qrj4kfdsrrc58z6wu0es8f5a7t9ez35d2pnr8ylvk3hcek2lp5e2qh25t09"))
+    throw Error("Wrong Bitcoin Core result for funded human mirrored leg B: "+values);
+ await page.locator("#fund").click();
+ await waitingForStatus("funding_status","API query completed",25000);
+ if(!(await page.locator("#funding_facts").innerText()).includes("0.00300000 BTC"))
+    throw Error("Missing mocked 300000-sat mirror funding balance");
+ if(apiRequests!==4)throw Error("Expected four opt-in Esplora requests for two human legs");
+ mark("mirrored human B Bitcoin Core and opt-in Esplora mock verified");
 
  await page.locator("#example_agent").click();
  await waitingForStatus("verify_status","Loaded Operator-agent cooperative leg",15000);
@@ -78,11 +99,11 @@ try{
  await waitingForStatus("funding_status","API query completed",25000);
  const agentFacts=await page.locator("#funding_facts").innerText();
  if(!agentFacts.includes("0.00000000 BTC"))throw Error("Mocked agent empty API balance missing");
- if(apiRequests!==4)throw Error("Expected 4 explicitly triggered API requests");
+ if(apiRequests!==6)throw Error("Expected 6 explicitly triggered API requests for 3 contracts");
 
  if(errors.length)throw Error("Browser page errors: "+errors.join("\n"));
  await page.screenshot({path:artifacts+"/verifier-success.png",fullPage:true});
- mark("ALL_BROWSER_ACCEPTANCE_PASS",{apiRequests,guestBoot:true,coreRPC:true,contractFamilies:2,thirdPartyReadsOptIn:true});
+ mark("ALL_BROWSER_ACCEPTANCE_PASS",{apiRequests,guestBoot:true,coreRPC:true,contractFamilies:2,contractsChecked:3,thirdPartyReadsOptIn:true});
 }catch(e){
  console.error("BROWSER_ACCEPTANCE_FAILED",e.stack||e);
  console.error("GUEST_SERIAL_TAIL",(await page.locator("#serial").innerText().catch(()=>"")).slice(-10000));
