@@ -48,13 +48,13 @@ footer {margin-top:45px;color:var(--muted);font-size:13px}
 <p class="note"><strong>Two separate trust boundaries.</strong> Bitcoin Core runs offline in the emulated Linux guest to decode a script or descriptor and derive its address. Funding information comes from an optional, explicit query to a third-party Esplora API; it is not independently validated blockchain consensus.</p>
 <section class="card">
 <h2>1 · Enter public contract data</h2>
-<label for="contract_input">Witness script HEX or a Bitcoin Core output descriptor</label>
-<textarea id="contract_input" spellcheck="false" autocomplete="off" placeholder="Paste a P2WSH witnessScript (hex), or a non-ranged output descriptor, e.g. addr(bc1q...)"></textarea>
+<label for="contract_input">Witness script HEX, raw(script) descriptor, or Bitcoin Core output descriptor</label>
+<textarea id="contract_input" spellcheck="false" autocomplete="off" placeholder="Paste witnessScript HEX or raw(HEX)#checksum, or a non-ranged output descriptor"></textarea>
 <div class="row">
 <div><label for="network">Bitcoin network</label><select id="network"><option value="main">Mainnet</option><option value="signet">Signet</option><option value="testnet4">Testnet4</option><option value="testnet">Testnet3</option></select></div>
 <div><button id="verify">Verify with Bitcoin Core</button></div>
 </div>
-<p class="muted"><small>Do not paste private keys, xprvs, WIF, wallet.dat, seed phrases, or secret descriptors. This tool is for public material only. To inspect OP_IF / OP_ELSE branches, provide the complete witnessScript HEX; an address or address-only descriptor cannot reveal the original script.</small></p>
+<p class="muted"><small>Do not paste private keys, xprvs, WIF, wallet.dat, seed phrases, or secret descriptors. This tool is for public material only. To inspect OP_IF / OP_ELSE branches, provide complete witnessScript HEX or raw(HEX)#checksum. A P2WSH address or addr(...) descriptor does not reveal its script.</small></p>
 </section>
 <section class="card" aria-live="polite">
 <h2>2 · Offline Bitcoin Core validation</h2>
@@ -74,7 +74,7 @@ footer {margin-top:45px;color:var(--muted);font-size:13px}
 </main>
 <script>
 "use strict";
-const GUEST_SCRIPT = "#!/bin/sh\n# Input reaches the guest only via the 9p share. There is no network device.\nM=/mnt\nD=/tmp/btc-contract-verifier\nCHAIN=$1\nMODE=$2\nJ=$M/$3\nJOB=$4\nLD=\"$M/ld-linux-x86-64.so.2 --library-path $M\"\nCLI=\"$LD $M/bitcoin-cli -datadir=$D -chain=$CHAIN\"\nfinish() { sync; printf '@@CONTRACT_DONE:%s:%s@@\\n' \"$JOB\" \"$1\"; exit \"$1\"; }\nif ! $CLI getblockchaininfo >/dev/null 2>&1; then\n    ip link set lo up 2>/dev/null || ifconfig lo up 2>/dev/null\n    mkdir -p \"$D\"\n    $LD \"$M/bitcoind\" -datadir=\"$D\" -chain=\"$CHAIN\" -disablewallet \\\n        -networkactive=0 -connect=0 -listen=0 -dnsseed=0 -listenonion=0 \\\n        -dbcache=16 -maxmempool=5 -par=1 -server=1 -printtoconsole=0 \\\n        >\"$D/bitcoind.out\" 2>&1 &\n    pid=$!\n    i=0\n    until $CLI getblockchaininfo >/dev/null 2>&1; do\n        i=$((i+1))\n        if ! kill -0 \"$pid\" 2>/dev/null || [ \"$i\" -gt 180 ]; then\n            cat \"$D/bitcoind.out\" >\"$J.error\"\n            finish 1\n        fi\n        sleep 1\n    done\nfi\nif [ \"$MODE\" = script ]; then\n    $CLI -stdin decodescript <\"$J.input\" >\"$J.decoded.json\" 2>\"$J.error\"\n    rc=$?\nelif [ \"$MODE\" = descriptor ]; then\n    $CLI -stdin getdescriptorinfo <\"$J.input\" >\"$J.info.json\" 2>\"$J.error\"\n    rc=$?\n    if [ \"$rc\" -eq 0 ]; then\n        $CLI -stdin deriveaddresses <\"$J.input\" >\"$J.addresses.json\" 2>\"$J.derive.error\"\n    fi\nelse\n    echo \"Unsupported verification mode\" >\"$J.error\"\n    rc=2\nfi\nfinish \"$rc\"\n";
+const GUEST_SCRIPT = "#!/bin/sh\n# Input reaches the guest only via the 9p share. There is no network device.\nM=/mnt\nD=/tmp/btc-contract-verifier\nCHAIN=$1\nMODE=$2\nJ=$M/$3\nJOB=$4\nLD=\"$M/ld-linux-x86-64.so.2 --library-path $M\"\nCLI=\"$LD $M/bitcoin-cli -datadir=$D -chain=$CHAIN\"\nfinish() { sync; printf '@@CONTRACT_DONE:%s:%s@@\\n' \"$JOB\" \"$1\"; exit \"$1\"; }\nif ! $CLI getblockchaininfo >/dev/null 2>&1; then\n    ip link set lo up 2>/dev/null || ifconfig lo up 2>/dev/null\n    mkdir -p \"$D\"\n    $LD \"$M/bitcoind\" -datadir=\"$D\" -chain=\"$CHAIN\" -disablewallet \\\n        -networkactive=0 -connect=0 -listen=0 -dnsseed=0 -listenonion=0 \\\n        -dbcache=16 -maxmempool=5 -par=1 -server=1 -printtoconsole=0 \\\n        >\"$D/bitcoind.out\" 2>&1 &\n    pid=$!\n    i=0\n    until $CLI getblockchaininfo >/dev/null 2>&1; do\n        i=$((i+1))\n        if ! kill -0 \"$pid\" 2>/dev/null || [ \"$i\" -gt 180 ]; then\n            cat \"$D/bitcoind.out\" >\"$J.error\"\n            finish 1\n        fi\n        sleep 1\n    done\nfi\nif [ \"$MODE\" = script ]; then\n    $CLI -stdin decodescript <\"$J.input\" >\"$J.decoded.json\" 2>\"$J.error\"\n    rc=$?\nelif [ \"$MODE\" = raw_descriptor ]; then\n    # Bitcoin Core must validate the complete descriptor, including an optional checksum.\n    $CLI -stdin getdescriptorinfo <\"$J.input\" >\"$J.info.json\" 2>\"$J.error\"\n    rc=$?\n    if [ \"$rc\" -eq 0 ]; then\n        $CLI -stdin decodescript <\"$J.script\" >\"$J.decoded.json\" 2>\"$J.error\"\n        rc=$?\n    fi\nelif [ \"$MODE\" = descriptor ]; then\n    $CLI -stdin getdescriptorinfo <\"$J.input\" >\"$J.info.json\" 2>\"$J.error\"\n    rc=$?\n    if [ \"$rc\" -eq 0 ]; then\n        $CLI -stdin deriveaddresses <\"$J.input\" >\"$J.addresses.json\" 2>\"$J.derive.error\"\n    fi\nelse\n    echo \"Unsupported verification mode\" >\"$J.error\"\n    rc=2\nfi\nfinish \"$rc\"\n";
 const ALPINE_ISO = "../images/alpine-virt-3.19.9-x86_64.iso";
 const ALPINE_BOOT = "../images/alpine-virt-3.19.9-x86_64/boot/";
 const BITCOIN_DIR = "../images/bitcoin/";
@@ -99,6 +99,7 @@ function publicInput(text) {
         if (text.length % 2 || text.length > 20000) throw Error("Witness script must contain whole hex bytes (max 10 KB).");
         return "script";
     }
+    if (/^raw\(([0-9a-fA-F]{2})+\)(?:#[a-z0-9]{8})?$/.test(text)) return "raw_descriptor";
     if (!/^[a-z_]+\(/.test(text) || /[\r\n]/.test(text)) throw Error("Expected witnessScript HEX or one Bitcoin Core output descriptor.");
     if (/[\\'";$]/.test(text)) throw Error("Unexpected character in descriptor.");
     return "descriptor";
@@ -106,35 +107,55 @@ function publicInput(text) {
 // The HODLXXI template is checked separately from Bitcoin Core's generic decodescript.
 // Reject malformed/ambiguous encodings rather than guessing which pubkey owns which CLTV.
 function parseTemplate(bytes) {
-    let p = 0;
-    const op = value => { if (bytes[p++] !== value) throw Error("Not the two-branch HODLXXI template"); };
-    const num = () => {
-        const code = bytes[p++];
-        if (code === 0) return 0;
-        if (code >= 0x51 && code <= 0x60) return code - 0x50;
-        if (code < 1 || code > 5 || p + code > bytes.length) throw Error("Unsupported CLTV number encoding");
-        const v = bytes.slice(p, p + code); p += code;
-        if ((v[v.length-1] & 0x7f) === 0 && (v.length === 1 || !(v[v.length-2] & 0x80)))
-            throw Error("Nonminimal CLTV encoding");
-        const negative = !!(v[v.length-1] & 0x80);
-        v[v.length-1] &= 0x7f;
-        let n = 0; for (let i = 0; i < v.length; i++) n += v[i] * 2 ** (8*i);
-        if (negative || n > 0xffffffff) throw Error("CLTV outside supported 32-bit nonnegative range");
-        return n;
+    let p=0;
+    const next=() => { if (p>=bytes.length) throw Error("Truncated script"); return bytes[p++]; };
+    const op=(expected) => { if(next()!==expected) throw Error("Not an exact HODLXXI contract template"); };
+    const pubkey=() => {
+        if(next()!==33 || p+33>bytes.length) throw Error("Expected direct 33-byte compressed public key");
+        const key=bytes.slice(p,p+33); p+=33;
+        if(key[0]!==2 && key[0]!==3) throw Error("Invalid compressed public key prefix");
+        return hexStr(key);
     };
-    const branch = () => {
-        const lock = num(); op(0xb1); op(0x75);
-        const size = bytes[p++];
-        if (size !== 33 || p+33 > bytes.length) throw Error("Expected 33-byte compressed pubkey");
-        const key = bytes.slice(p,p+33); p+=33;
-        if (key[0] !== 2 && key[0] !== 3) throw Error("Invalid compressed pubkey prefix");
-        op(0xac);
-        return {lock, pubkey:hexStr(key)};
+    const height=() => {
+        const code=next();
+        if(code>=0x51 && code<=0x60) return code-0x50;
+        if(code<1 || code>5 || p+code>bytes.length) throw Error("Unsupported CLTV ScriptNum encoding");
+        const v=bytes.slice(p,p+code);p+=code;
+        if(v.length===1 && v[0]>=1 && v[0]<=16) throw Error("Nonminimal ScriptNum");
+        if((v[v.length-1]&0x7f)===0 && (v.length===1 || !(v[v.length-2]&0x80)))
+            throw Error("Nonminimal ScriptNum encoding");
+        if(v[v.length-1]&0x80) throw Error("Negative CLTV ScriptNum");
+        let h=0;for(let i=0;i<v.length;i++)h+=v[i]*2**(8*i);
+        if(!Number.isSafeInteger(h)||h<=0||h>=500000000) throw Error("Expected a positive CLTV block height");
+        return h;
     };
-    op(0x63); const ifBranch = branch();
-    op(0x67); const elseBranch = branch(); op(0x68);
-    if (p !== bytes.length) throw Error("Trailing script bytes");
-    return {ifBranch, elseBranch};
+    const branch=()=>{
+        const lock=height();op(0xb1);op(0x75);const key=pubkey();op(0xac);
+        return {lock,pubkey:key};
+    };
+    op(0x63);
+    let cooperative=[];
+    if(bytes[p]===0x52) {
+        op(0x52);
+        cooperative=[pubkey(),pubkey()];
+        op(0x52);op(0xae);op(0x67);op(0x63);
+    }
+    const ifBranch=branch();
+    op(0x67);const elseBranch=branch();
+    op(0x68);
+    if(cooperative.length)op(0x68);
+    if(p!==bytes.length) throw Error("Trailing script bytes");
+    if(ifBranch.pubkey===elseBranch.pubkey) throw Error("Identical unilateral participants");
+    if(elseBranch.lock<=ifBranch.lock) throw Error("Sender locktime must be later than receiver locktime");
+    if(cooperative.length) {
+        const same=cooperative.length===2 && cooperative[0]!==cooperative[1] &&
+            cooperative.slice().sort().join("|")===[ifBranch.pubkey,elseBranch.pubkey].sort().join("|");
+        if(!same)throw Error("Cooperative 2-of-2 keys must match both unilateral participants");
+    }
+    return {
+        family:cooperative.length?"cooperative_2_of_2_cltv":"cltv_only",
+        ifBranch,elseBranch,cooperative,delta:elseBranch.lock-ifBranch.lock
+    };
 }
 function lockText(v) {
     return v < 500000000 ? "block " + v : new Date(v*1000).toISOString();
@@ -222,6 +243,10 @@ async function runJob() {
     status("verify_status","Checking " + job.mode + " with unmodified Bitcoin Core (initial node startup may take a minute)…");
     try {
         await emulator.create_file("/contract-" + job.id + ".input", enc(job.input+"\n"));
+        if (job.mode==="raw_descriptor") {
+            const hex=job.input.match(/^raw\(([0-9a-fA-F]+)\)/)[1];
+            await emulator.create_file("/contract-" + job.id + ".script", enc(hex+"\n"));
+        }
         emulator.serial0_send("sh /mnt/contract-verify.sh " + job.network + " " + job.mode + " contract-" + job.id + " " + job.id + "\n");
     } catch(e) {
         current=null; guestState="ready"; status("verify_status",e.message,"bad");
@@ -243,27 +268,37 @@ async function finishJob(rc) {
         return;
     }
     try {
-        const response = JSON.parse(job.mode==="script"?decodedText:infoText);
-        const derived = job.mode==="script" ? response.segwit?.address :
+        const isScript=job.mode==="script"||job.mode==="raw_descriptor";
+        const response = JSON.parse(isScript?decodedText:infoText);
+        const descriptorInfo=job.mode==="raw_descriptor"?JSON.parse(infoText):null;
+        const derived = isScript ? response.segwit?.address :
             ((() => {try {const a=JSON.parse(addressesText);return Array.isArray(a)&&a.length===1?a[0]:null;}catch(e){return null;}})());
-        if (!derived && job.mode==="script") throw Error("Bitcoin Core did not produce a native SegWit address; cannot claim P2WSH.");
+        if (!derived && isScript) throw Error("Bitcoin Core did not produce a native SegWit address; cannot claim P2WSH.");
         $("facts").textContent=""; $("result").hidden=false;
         addFact("facts","Network",job.network);
-        addFact("facts","Input type",job.mode==="script"?"Witness script (HEX)":"Output descriptor");
-        if (job.mode==="script") {
+        addFact("facts","Input type",job.mode==="script"?"Witness script (HEX)":job.mode==="raw_descriptor"?"Raw script descriptor (not a P2WSH output descriptor)":"Output descriptor");
+        if (isScript) {
             addFact("facts","Bitcoin Core ASM",response.asm || "(none)");
-            const hash=await sha256hex(hexBytes(job.input));
+            const scriptHex=job.mode==="script"?job.input:job.input.match(/^raw\(([0-9a-fA-F]+)\)/)[1];
+            const hash=await sha256hex(hexBytes(scriptHex));
+            if (!hash) throw Error("SHA256 not supported in this browser");
+            if (response.segwit?.hex?.toLowerCase() !== "0020"+hash)
+                throw Error("Bitcoin Core SegWit witness program does not match independently hashed script");
+            addFact("facts","P2WSH scriptPubKey","0020"+hash);
+            if (descriptorInfo) addFact("facts","Bitcoin Core descriptor checksum",descriptorInfo.checksum || "(none)");
             if (hash) addFact("facts","Witness script SHA256",hash);
             try {
-                const matched=parseTemplate(hexBytes(job.input));
-                addFact("facts","HODLXXI two-branch template","Exact syntax match; not a spendability proof");
+                const matched=parseTemplate(hexBytes(scriptHex));
+                addFact("facts","HODLXXI template",matched.family+" · exact byte-level syntax match (not a spendability proof)");
+                addFact("facts","CLTV delta",matched.delta+" blocks"+(matched.delta===777?" · legacy_777 human profile":matched.delta===144?" · current_144 interval":" · nonstandard profile"));
+                if (matched.cooperative.length) addFact("facts","Cooperative path","2-of-2 immediate branch: "+matched.cooperative.join(" + "));
                 addFact("facts","OP_IF pubkey",matched.ifBranch.pubkey);
                 addFact("facts","OP_IF CLTV",lockText(matched.ifBranch.lock));
                 addFact("facts","OP_ELSE pubkey",matched.elseBranch.pubkey);
                 addFact("facts","OP_ELSE CLTV",lockText(matched.elseBranch.lock));
                 addFact("facts","Timelock order",matched.ifBranch.lock<=matched.elseBranch.lock?"IF not later than ELSE":"IF later than ELSE — inspect contract intent");
                 addFact("facts","CLTV condition","Requires valid signature, matching nLockTime type and non-final nSequence");
-            } catch(e) {addFact("facts","HODLXXI template","Not recognized: "+e.message+" (general Bitcoin script may still be valid)");}
+            } catch(e) {addFact("facts","HODLXXI template","Not recognized: "+e.message+" (Bitcoin Core decodes scripts without proving spendability)");}
         } else {
             addFact("facts","Descriptor checksum",response.checksum || "none");
             addFact("facts","Ranged descriptor",String(response.isrange));
@@ -277,7 +312,7 @@ async function finishJob(rc) {
             addFact("facts","Derived address",derived);
             verifiedAddress=derived;verifiedNetwork=job.network;$("fund").disabled=false;
         }
-        $("core_response").textContent=JSON.stringify(response,null,2);
+        $("core_response").textContent=JSON.stringify(isScript&&descriptorInfo?{descriptorInfo,decodedScript:response}:response,null,2);
         status("verify_status",derived?"Bitcoin Core decoded the input and derived an address. This is not a spendability proof; funding has NOT been checked.":"Bitcoin Core validated the descriptor, but a single address could not be derived.","ok");
     } catch(e) {status("verify_status","Could not interpret Bitcoin Core result: "+e.message,"bad");}
 }
