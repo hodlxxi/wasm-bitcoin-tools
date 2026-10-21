@@ -1,8 +1,8 @@
 {
-    "site_url": "https://portlandhodl.github.io/wasm-bitcoin-tools/",
-    "site_name": "wasm-bitcoin-tools",
-    "title": "wasm-bitcoin-tools: Bitcoin tools that run Bitcoin Core in your browser",
-    "description": "A directory of Bitcoin tools built on v86_64: each runs an unmodified Bitcoin Core in a Linux machine emulated in WebAssembly in the browser tab, offline. Nothing is uploaded.",
+    "site_url": "https://hodlxxi.github.io/wasm-bitcoin-tools/",
+    "site_name": "wasm-bitcoin-tools · HODLXXI",
+    "title": "Bitcoin Core WASM tools and independent Contract Verifier · HODLXXI",
+    "description": "Browser-based Bitcoin Core tools: offline wallet, vault and PSBT checks, plus a public-data-only contract inspector with explicit, optional Esplora funding lookup.",
     "apps": [
         {
             "page": "bitcoin-wallet-check",
@@ -61,6 +61,21 @@
             ],
             "image": "og-psbt-finalizer.png",
             "image_alt": "PSBT finalizer: a timelocked PSBT finalized at block 0, broadcastable from 17 March 2030"
+        },
+        {
+            "page": "contract-verifier",
+            "title": "Bitcoin Contract Verifier: independently decode P2WSH scripts and check funding",
+            "description": "Inspect public Bitcoin scripts and descriptors with offline, unmodified Bitcoin Core in the browser. Check externally reported UTXOs only on request through mempool.space.",
+            "theme_color": "#f7931a",
+            "name": "Bitcoin Contract Verifier",
+            "tagline": "Verify P2WSH witness scripts, OP_IF / OP_ELSE CLTV branches and derived addresses with local Bitcoin Core; optionally inspect mempool.space UTXOs.",
+            "icon": "seal",
+            "tags": [
+                "P2WSH",
+                "CLTV",
+                "descriptors",
+                "optional Esplora"
+            ]
         }
     ],
     "links": [
