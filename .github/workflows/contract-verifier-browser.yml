@@ -46,6 +46,12 @@ jobs:
         env:
           SITE_URL: http://127.0.0.1:8765/
 
+      - name: Build all four offline single-file releases without publishing
+        run: |
+          node scripts/build-offline.mjs --out _offline
+          (cd _offline && sha256sum -c SHA256SUMS)
+          test -s _offline/contract-verifier.html
+
       - name: Install browser test runner
         run: npm install --no-save --no-package-lock playwright@1.56.1
 
