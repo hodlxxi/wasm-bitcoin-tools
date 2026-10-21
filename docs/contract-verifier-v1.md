@@ -66,6 +66,37 @@ For P2WSH, CLTV does not automatically guarantee future spendability;
 Script execution depends on branch choice, signatures, nLockTime type/value,
 input nSequence and Bitcoin consensus validity at broadcast time.
 
+## Recorded external funding snapshot (not a consensus proof)
+
+On **2026-10-21 03:13:37 UTC**, a read-only GitHub Actions runner queried
+**mempool.space** and **Blockstream.info** directly for the three public
+P2WSH contract addresses. Both API sources returned matching balance totals
+and exact confirmed outpoint collections for the human mirrored pair:
+
+| Public contract | Current confirmed UTXOs reported | Confirmed unspent balance |
+| --- | ---: | ---: |
+| Human legacy_777 leg A (`bc1qqkkh…`) | 3 | **300,000 sats (0.003 BTC)** |
+| Human legacy_777 leg B (`bc1qrj4k…`) | 2 | **300,000 sats (0.003 BTC)** |
+| Operator–agent current_144 (`bc1qsrpj…`) | 0 | **0 sats** |
+
+Detailed confirmed outpoints reported for leg A:
+`133129 + 44648 + 122223 = 300000 sats`.
+For leg B:
+`177777 + 122223 = 300000 sats`.
+
+This **300,000 satoshi amount must not be confused with 300 satoshis**.
+Each human address had a matching on-chain `chain_stats` balance of
+300,000 sats with no unconfirmed UTXOs in these snapshots.
+The agent address had no transaction history reported at the time.
+
+[GitHub Actions read-only probe and full logs](https://github.com/hodlxxi/wasm-bitcoin-tools/actions/runs/39537388596).
+
+These are time-bound external API reports, **not proof that amounts remain
+unspent at a later time** and not full-node consensus verification.
+Script→hash→address linkage was separately verified using the public
+witnessScript bytes. No HODLXXI server, wallets, credentials, or private keys
+were used.
+
 ## Automated tests
 
 `node --test tests/contract-verifier.test.mjs` runs without a node, wallet,
