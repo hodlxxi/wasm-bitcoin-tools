@@ -1,0 +1,70 @@
+# Only build and test the proposed verifier in the PR branch.
+# Never deploy GitHub Pages or publish the upstream-style "offline" release here.
+name: Contract Verifier Browser Acceptance
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "apps/contract-verifier.html"
+      - "tests/browser-contract-verifier-smoke.mjs"
+      - "tests/fixtures/public-contract-vectors.json"
+      - "site/site.json"
+      - ".github/workflows/contract-verifier-browser.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bitcoin-core-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout verifier branch including v86_64 submodule
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install emulated Linux build dependencies
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add wasm32-unknown-unknown
+          sudo apt-get update -qq
+          sudo apt-get install -y libarchive-tools clang
+          google-chrome --version
+
+      - name: Build v86_64 and stage upstream Alpine + Bitcoin Core
+        run: ./scripts/setup.sh
+
+      - name: Build isolated static preview (do not deploy)
+        run: node scripts/build-site.mjs --out _site
+        env:
+          SITE_URL: http://127.0.0.1:8765/
+
+      - name: Install browser test runner
+        run: npm install --no-save --no-package-lock playwright@1.56.1
+
+      - name: Boot actual Bitcoin Core in Chromium and verify contracts
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory _site >/tmp/verifier-http.log 2>&1 &
+          echo $! >/tmp/verifier-http.pid
+          sleep 2
+          curl --fail --silent --show-error --head http://127.0.0.1:8765/apps/contract-verifier.html
+          node tests/browser-contract-verifier-smoke.mjs
+        env:
+          CONTRACT_VERIFIER_TEST_URL: http://127.0.0.1:8765/
+          CONTRACT_VERIFIER_TEST_OUTPUT: /tmp/contract-verifier-browser
+
+      - name: Upload redacted browser diagnostics and screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-verifier-browser-smoke
+          path: /tmp/contract-verifier-browser/
+          if-no-files-found: ignore
+          retention-days: 7
