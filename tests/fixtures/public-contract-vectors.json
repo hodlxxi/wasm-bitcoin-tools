@@ -1,0 +1,74 @@
+{
+  "schema": "hodlxxi.contract_verifier_public_vectors.v1",
+  "network": "bitcoin-mainnet",
+  "scope": "Public script and descriptor material only; these fixtures do not include private keys or provide fresh funding assertions",
+  "sources": [
+    "https://github.com/hodlxxi/Universal-Bitcoin-Identity-Layer/blob/main/tests/unit/test_mirrored_covenant_pair.py",
+    "https://github.com/hodlxxi/Universal-Bitcoin-Identity-Layer/blob/main/app/data/trust/covenant_hodlxxi-herald-covenant-v1.json",
+    "https://github.com/hodlxxi/Universal-Bitcoin-Identity-Layer/blob/main/docs/data/e923_canonical_crt_runtime_bootstrap_v1.json"
+  ],
+  "vectors": [
+    {
+      "name": "Human mirrored leg A · legacy_777",
+      "family": "cltv_only",
+      "network": "main",
+      "source": "tests/unit/test_mirrored_covenant_pair.py::LEGACY_1",
+      "script_hex": "6303681d1bb17521023d34633c5c1b72050fede84dcc396b5ea969fa40daa2eabf24cc339959f9e923ac670371201bb17521032f664095c520438506ddea8f584be08aeef210bc7ec37817a56478a489b72a8cac68",
+      "witness_script_sha256": "05ad7330848fecfd467efbe4d1bcd0f3468362cf57e190a91c345b63a152e933",
+      "p2wsh_address": "bc1qqkkhxvyy3lk063n7l0jdr0xs7drgxck02lsep2gux3dk8g2jayesshrwfu",
+      "if": {
+        "lock": 1777000,
+        "pubkey": "023d34633c5c1b72050fede84dcc396b5ea969fa40daa2eabf24cc339959f9e923"
+      },
+      "else": {
+        "lock": 1777777,
+        "pubkey": "032f664095c520438506ddea8f584be08aeef210bc7ec37817a56478a489b72a8c"
+      },
+      "delta_blocks": 777,
+      "known_live_status": "historically registered funding outpoints; current state not independently asserted"
+    },
+    {
+      "name": "Human mirrored leg B · legacy_777",
+      "family": "cltv_only",
+      "network": "main",
+      "source": "tests/unit/test_mirrored_covenant_pair.py::LEGACY_2",
+      "script_hex": "630371201bb17521032f664095c520438506ddea8f584be08aeef210bc7ec37817a56478a489b72a8cac67037a231bb17521023d34633c5c1b72050fede84dcc396b5ea969fa40daa2eabf24cc339959f9e923ac68",
+      "witness_script_sha256": "1cab64b6031e287169dc7e6074d3be597228d1aa0cc6727d968df19b2be1a654",
+      "p2wsh_address": "bc1qrj4kfdsrrc58z6wu0es8f5a7t9ez35d2pnr8ylvk3hcek2lp5e2qh25t09",
+      "if": {
+        "lock": 1777777,
+        "pubkey": "032f664095c520438506ddea8f584be08aeef210bc7ec37817a56478a489b72a8c"
+      },
+      "else": {
+        "lock": 1778554,
+        "pubkey": "023d34633c5c1b72050fede84dcc396b5ea969fa40daa2eabf24cc339959f9e923"
+      },
+      "delta_blocks": 777,
+      "known_live_status": "historically registered funding outpoints; current state not independently asserted"
+    },
+    {
+      "name": "Operator-agent cooperative leg · current_144",
+      "family": "cooperative_2_of_2_cltv",
+      "network": "main",
+      "source": "app/data/trust/covenant_hodlxxi-herald-covenant-v1.json",
+      "script_hex": "63522102019e7a92d22e4467e0afb20ce62976e976d1558e553351e1fb1a886b4a149f9221023d34633c5c1b72050fede84dcc396b5ea969fa40daa2eabf24cc339959f9e92352ae67630371201bb1752102019e7a92d22e4467e0afb20ce62976e976d1558e553351e1fb1a886b4a149f92ac670301211bb17521023d34633c5c1b72050fede84dcc396b5ea969fa40daa2eabf24cc339959f9e923ac6868",
+      "raw_descriptor": "raw(63522102019e7a92d22e4467e0afb20ce62976e976d1558e553351e1fb1a886b4a149f9221023d34633c5c1b72050fede84dcc396b5ea969fa40daa2eabf24cc339959f9e92352ae67630371201bb1752102019e7a92d22e4467e0afb20ce62976e976d1558e553351e1fb1a886b4a149f92ac670301211bb17521023d34633c5c1b72050fede84dcc396b5ea969fa40daa2eabf24cc339959f9e923ac6868)#yemvdjs8",
+      "witness_script_sha256": "80c3294e2e3fc876f7dca149e2385f256f9f7d33f9eba500660c5b1d1d193661",
+      "p2wsh_address": "bc1qsrpjjn3w8ly8da7u59y7ywzly4he7lfnl8462qrxp3d368gexess3tjdz3",
+      "if": {
+        "lock": 1777777,
+        "pubkey": "02019e7a92d22e4467e0afb20ce62976e976d1558e553351e1fb1a886b4a149f92"
+      },
+      "else": {
+        "lock": 1777921,
+        "pubkey": "023d34633c5c1b72050fede84dcc396b5ea969fa40daa2eabf24cc339959f9e923"
+      },
+      "cooperative_pubkeys": [
+        "02019e7a92d22e4467e0afb20ce62976e976d1558e553351e1fb1a886b4a149f92",
+        "023d34633c5c1b72050fede84dcc396b5ea969fa40daa2eabf24cc339959f9e923"
+      ],
+      "delta_blocks": 144,
+      "known_live_status": "unfunded_declared; not a funding proof"
+    }
+  ]
+}
