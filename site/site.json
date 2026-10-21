@@ -65,16 +65,19 @@
         {
             "page": "contract-verifier",
             "title": "Bitcoin Contract Verifier: independently decode P2WSH scripts and check funding",
-            "description": "Inspect public Bitcoin scripts and descriptors with offline, unmodified Bitcoin Core in the browser. Check externally reported UTXOs only on request through mempool.space.",
+            "description": "Use unmodified offline Bitcoin Core to inspect public HODLXXI P2WSH scripts (including legacy_777 human and current_144 operator-agent patterns), with optional Esplora funding lookup.",
             "theme_color": "#f7931a",
             "name": "Bitcoin Contract Verifier",
-            "tagline": "Verify P2WSH witness scripts, OP_IF / OP_ELSE CLTV branches and derived addresses with local Bitcoin Core; optionally inspect mempool.space UTXOs.",
+            "tagline": "Decode P2WSH scripts and raw descriptors, inspect 777- or 144-block timelock paths, derive addresses with Bitcoin Core, and optionally query reported UTXOs.",
             "icon": "seal",
             "tags": [
                 "P2WSH",
                 "CLTV",
                 "descriptors",
                 "optional Esplora"
+            ],
+            "files": [
+                "tests/fixtures/public-contract-vectors.json"
             ]
         }
     ],
